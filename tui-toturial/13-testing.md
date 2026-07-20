@@ -294,6 +294,7 @@ class VirtualTerminal {
   constructor(width: number = 80, height: number = 24) {
     this.screen = blessed.screen({
       smartCSR: true,
+      fullUnicode: true,
       terminal: 'xterm-256color',
       input: new EventEmitter() as any,
       output: {

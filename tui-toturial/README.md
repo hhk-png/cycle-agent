@@ -53,9 +53,9 @@ npx tsx llm-chat.ts
 
 | 快捷键 | 基础示例 | 大模型对话 |
 |--------|---------|-----------|
-| `Ctrl+S` | — | 发送消息 |
+| `Ctrl+S` / `Alt+S` | — | 发送消息（Alt+S 做 Windows 备选） |
 | `Ctrl+Q` | 退出 | 退出 |
-| `Ctrl+C` | — | 取消生成 |
+| `Ctrl+C` / `Ctrl+X` | — | 取消生成 |
 | `Tab` / `Shift+Tab` | 切换焦点 | — |
 | `↑` / `↓` | 列表导航 | 输入历史 / 聊天区域滚动 |
 | `PageUp` / `PageDown` | — | 快速滚动 |
@@ -143,11 +143,17 @@ tui-toturial/
 
 ### 1. Ctrl+S 被终端拦截？
 
-某些终端（特别是 Linux/macOS 默认终端）会拦截 Ctrl+S 作为流控（XOFF）。运行以下命令禁用：
+**Unix (Linux/macOS)**: 终端会拦截 Ctrl+S 作为流控（XOFF）。运行以下命令禁用：
 
 ```bash
 stty -ixon
 ```
+
+**Windows Terminal**: Ctrl+S 默认不会被拦截（Windows 无 XOFF 流控）。如果仍无效，尝试以下方案：
+- 使用 **Alt+S** 作为替代发送键（已内置支持）
+- 在 Windows Terminal 设置中检查是否有键位冲突：
+  - 设置 → 操作 → 搜索 "ctrl+s" → 删除或修改绑定
+- 或使用 VSCode 终端运行（通常无此问题）
 
 ### 2. Windows 用户
 
@@ -182,7 +188,7 @@ cd examples && rm -rf node_modules && npm install
 | 界面空白无响应 | 终端太小或编码问题 | 确保终端 ≥ 80x24 且为 UTF-8 |
 | 颜色显示异常 | 终端不支持 TrueColor | 检查 `$TERM` 环境变量 |
 | emoji 显示为方框 | 缺少字体 | 安装 Nerd Font 或 Cascadia Code |
-| Ctrl+S 无响应 | 被终端流控拦截 | `stty -ixon` |
+| Ctrl+S/Alt+S 无响应 | 被终端流控拦截 或 Windows 键位冲突 | Unix: `stty -ixon`；Windows: 用 Alt+S 发送 或检查 Windows Terminal 键位设置 |
 | 中文显示乱码 | 编码非 UTF-8 | 终端设置 UTF-8 编码 |
 | 程序崩溃后终端异常 | 未正确恢复状态 | 运行 `reset` 命令恢复 |
 

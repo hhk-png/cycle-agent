@@ -121,6 +121,7 @@ import * as blessed from 'neo-blessed'; // 或者 'blessed'
 
 const screen = blessed.screen({
   smartCSR: true,       // 智能光标保存/恢复 —— 只更新变化区域
+  fullUnicode: true,    // 完整 Unicode 支持（emoji/CJK）
   title: 'My TUI App',  // 终端窗口标题
   cursor: {
     artificial: true,   // 使用 blessed 模拟的光标

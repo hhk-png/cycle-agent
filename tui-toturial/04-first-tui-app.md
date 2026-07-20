@@ -75,14 +75,10 @@ import type { Widgets } from "blessed";
 
 const screen = blessed.screen({
   smartCSR: true,       // 智能光标保存/恢复 —— 减少闪烁
+  fullUnicode: true,    // 完整 Unicode 支持（emoji/CJK）
   title: "TUI 基础示例", // 终端标签标题
-  cursor: {
-    artificial: true,   // 使用 blessed 模拟的光标而非终端原生光标
-    shape: "line",      // line | block | underline
-    blink: true,
-    color: "cyan",
-  },
   useBCE: true,         // 使用背景色擦除（减少绘制量）
+  resizeTimeout: 200,   // resize 事件节流 (ms)
 });
 ```
 
@@ -93,7 +89,7 @@ const screen = blessed.screen({
 | `smartCSR` | 启用后只更新变化区域，而非全屏重绘 | `true` | 大幅减少闪烁和输出量 |
 | `useBCE` | 使用背景色擦除字符，减少输出量 | `true` | 减少终端 IO |
 | `fullUnicode` | 完整 Unicode 支持（如 emoji） | `true` | 防止中文/emoji 显示异常 |
-| `dockBorders` | 相邻边框自动合并为单线 | `true` | 避免双线边框 |
+| `useBCE` | 使用背景色擦除减少输出 | `true` | 减少终端 IO |
 | `resizeTimeout` | 窗口 resize 事件的节流时间 (ms) | `200` | 避免频繁重绘 |
 
 ### 4.3.2 布局构建
@@ -211,8 +207,11 @@ list.on("select", (item: Widgets.BoxElement) => {
 ### 4.3.4 事件处理
 
 ```typescript
-// ── 全局快捷键 ──
-screen.key("C-q", () => process.exit(0));
+// ── 全局快捷键（key.ignore=true 防止事件泄漏到焦点组件） ──
+screen.key("C-q", (_ch, key) => {
+  key.ignore = true;
+  process.exit(0);
+});
 screen.key("escape", () => log("按下 Escape"));
 
 // ── Tab 循环切换焦点 ──
@@ -241,6 +240,20 @@ focusable.forEach((w) => {
   });
 });
 ```
+
+> **💡 关于 `key.ignore`：** 在 blessed 中，`screen.key()` 注册的全局快捷键触发后，按键事件仍会继续传播到当前焦点的组件（如 `textarea`、`list`），可能导致控制字符被插入输入框。设置 `key.ignore = true` 可以阻止焦点组件处理此键。这是 Windows 下避免 `Ctrl+Q`、`Ctrl+S` 等按键产生乱字符的关键技巧。
+
+#### Windows 兼容性说明
+
+Windows Terminal + ConPTY 环境下，blessed 的键盘事件处理可能不稳定。建议采用**三层兜底**策略确保核心快捷键可用：
+
+```
+层级 1: screen.key('C-q', handler)   ← blessed 标准绑定
+层级 2: screen.on('keypress', ...)    ← keypress 事件直检键名
+层级 3: process.stdin.on('data', ...) ← 原始字节流匹配（绕过 blessed）
+```
+
+具体实现参看 `examples/basic-tui.ts` 和 `examples/llm-chat.ts` 中的相关代码。
 
 #### 4.3.4.1 事件委托模式
 
