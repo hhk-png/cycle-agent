@@ -124,8 +124,9 @@ private flushBatch(): void {
 // blessed 内置 smartCSR 自动处理差分更新
 // 只需确保：
 const screen = blessed.screen({
-  smartCSR: true,  // 开启智能光标保存/恢复
-  fastCSR: true,   // 快速 CSR 模式
+  smartCSR: true,    // 开启智能光标保存/恢复
+  fullUnicode: true, // 完整 Unicode 支持（emoji/CJK）
+  fastCSR: true,     // 快速 CSR 模式
 });
 // 剩下的 blessed 会自动处理
 ```

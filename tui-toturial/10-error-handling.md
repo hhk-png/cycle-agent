@@ -1096,6 +1096,7 @@ class ChatTUI {
     // 创建 blessed 屏幕
     this.screen = blessed.screen({
       smartCSR: true,
+      fullUnicode: true,   // 完整 Unicode 支持（emoji/CJK）
       title: 'AI Chat TUI',
     });
 

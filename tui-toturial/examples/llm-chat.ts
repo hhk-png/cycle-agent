@@ -15,12 +15,13 @@
  *   cd examples && npm install && npx tsx llm-chat.ts
  *
  * 快捷键:
- *   Ctrl+S    — 发送消息
+ *   Ctrl+S / Alt+S — 发送消息（Win 下 C-s 被拦截时 Alt+S 作为备选）
  *   Ctrl+Q    — 退出程序
- *   Ctrl+C    — 取消生成（预留接口）
- *   ↑/↓       — 滚动聊天区域
+ *   Ctrl+C / Ctrl+X     — 取消生成（C-x 作为 Windows 下的备选）
+ *   ↑/↓       — 滚动聊天区域 / 输入历史
  *   PageUp/Dn — 快速滚动
  *   Esc       — 清空输入框
+ *   R         — 错误后重试
  *
  * 对话场景（在输入框中输入以下关键词触发）:
  *   🌤️  天气查询  — 说 "北京天气" 触发工具调用
@@ -476,15 +477,15 @@ class ChatTUI {
   // ── 历史消息数上限（防止内存泄漏） ──
   private static readonly MAX_HISTORY = 100;
 
+  // ── 输入防重入守卫（Windows 下避免 stdin 和 blessed 双发） ──
+  private inputGuard = false;
+
   constructor() {
     // 创建屏幕
     this.screen = blessed.screen({
       smartCSR: true,
+      fullUnicode: true,   // 完整 Unicode 支持（emoji/CJK）
       title: "AI Chat TUI — 大模型对话终端",
-      cursor: { artificial: true, shape: "line", blink: true, color: "cyan" },
-      dockBorders: true,
-      ignoreDockContrast: true,
-      fastCSR: true,
       useBCE: true,
       resizeTimeout: 200,
     });
@@ -510,6 +511,45 @@ class ChatTUI {
     // 初始聚焦到输入框
     this.inputBox.focus();
     this.screen.render();
+
+    // ═══════════════════════════════════════════════════════
+    // 兜底: 直接监听 process.stdin 原始字节
+    // Windows Terminal + ConPTY 下 blessed 的 key 事件可能失效
+    // 此处理器直接检测控制字符字节码，不依赖 blessed 的键名匹配
+    // ═══════════════════════════════════════════════════════
+    process.stdin.on("data", (raw: Buffer | string) => {
+      const data = typeof raw === "string" ? raw : raw.toString("utf8");
+      for (const ch of data) {
+        this.handleRawByte(ch);
+      }
+    });
+  }
+
+  /**
+   * 处理原始 stdin 字节 —— 绕过 blessed 的键名匹配，直接检测控制字符
+   * 只在 blessed 的 key 事件失效时作为兜底，不影响正常输入
+   */
+  private handleRawByte(ch: string): void {
+    if (this.inputGuard) return;
+    this.inputGuard = true;
+    setTimeout(() => { this.inputGuard = false; }, 200);
+
+    const code = ch.charCodeAt(0);
+    switch (code) {
+      case 19: // Ctrl+S — 发送消息
+        this.executeSend();
+        break;
+      case 17: // Ctrl+Q — 退出
+        this.executeExit();
+        break;
+      case 24: // Ctrl+X — 取消生成
+        this.executeCancel();
+        break;
+      case 3:  // Ctrl+C — 取消生成（Windows ConPTY 可能拦截，保留）
+        this.executeCancel();
+        break;
+      // 其他字符（字母、数字、中文、方向键等）由 blessed 处理，此处不拦截
+    }
   }
 
   /** 检查终端尺寸是否满足最小要求 */
@@ -580,15 +620,14 @@ class ChatTUI {
       border: { type: "line", fg: Theme.inputBorder as any },
     });
 
-    // ── 帮助栏（固定底部 1 行） ──
+    // ── 帮助栏（固定底部 1 行，内容需适配 80 列终端） ──
     this.helpBar = blessed.box({
       parent: this.screen,
       bottom: 0,
       left: 0,
       width: "100%",
       height: 1,
-      content:
-        " {green-fg}Ctrl+S{/green-fg} 发送  {red-fg}Ctrl+Q{/red-fg} 退出  {yellow-fg}Ctrl+C{/yellow-fg} 取消  {cyan-fg}↑↓{/cyan-fg} 输入历史/滚动  {white-fg}R{/white-fg} 重试  {white-fg}Esc{/white-fg} 清空",
+      content: " {green-fg}Ctrl+S{/green-fg}发 {yellow-fg}Ctrl+Q{/yellow-fg}退 {red-fg}Ctrl+X{/red-fg}停 {cyan-fg}↑↓{/cyan-fg}滚 {white-fg}R重试{/white-fg} {white-fg}Esc清{/white-fg}",
       style: { fg: "#888888", bg: "#0a0a0a" },
       tags: true,
     });
@@ -599,37 +638,31 @@ class ChatTUI {
   // ==========================================================
 
   private bindKeys(): void {
-    // 发送消息
-    this.screen.key("C-s", () => {
-      if (this.state !== "idle") return;
-      const text = this.inputBox.getValue().trim();
-      if (!text) {
-        this.flashInputBorder();
-        return;
-      }
-      this.inputBox.clearValue();
-      this.screen.render();
-      this.sendMessage(text);
+    // ═══════════════════════════════════════════════
+    // 发送消息 —— 由 blessed key 事件和原始 stdin 兜底共用
+    // ═══════════════════════════════════════════════
+    // 注意: key.ignore = true 阻止焦点组件（textarea）继续处理此键
+    this.screen.key("C-s", (_ch, key) => { key.ignore = true; this.executeSend(); return false; });
+    this.screen.key("M-s", (_ch, key) => { key.ignore = true; this.executeSend(); return false; });
+    // keypress 兜底: 直接检测键名（绕过 key() 的键名匹配）
+    this.screen.on("keypress", (_ch, key) => {
+      if (key.name === "s" && key.ctrl) this.executeSend();
     });
 
+    // ═══════════════════════════════════════════════
     // 退出
-    this.screen.key("C-q", () => {
-      this.addSystemMessage("{cyan-fg}感谢使用 AI Chat TUI，再见！👋{/cyan-fg}");
-      this.screen.render();
-      setTimeout(() => {
-        this.cleanup();
-        process.exit(0);
-      }, 500);
-    });
+    // ═══════════════════════════════════════════════
+    this.screen.key("C-q", (_ch, key) => { key.ignore = true; this.executeExit(); return false; });
 
-    // 取消生成（预留）
-    this.screen.key("C-c", () => {
-      if (this.state !== "idle" && this.abortController) {
-        this.abortController.abort();
-      }
-    });
+    // ═══════════════════════════════════════════════
+    // 取消生成
+    // ═══════════════════════════════════════════════
+    this.screen.key("C-c", (_ch, key) => { key.ignore = true; this.executeCancel(); return false; });
+    this.screen.key("C-x", (_ch, key) => { key.ignore = true; this.executeCancel(); return false; });
 
+    // ═══════════════════════════════════════════════
     // 聊天区域滚动
+    // ═══════════════════════════════════════════════
     const scroll = (amount: number) => {
       this.chatBox.scroll(amount);
       this.screen.render();
@@ -638,12 +671,12 @@ class ChatTUI {
     this.chatBox.key("down", () => scroll(1));
     this.chatBox.key("pageup", () => scroll(-Math.floor((this.chatBox.height as number) / 2)));
     this.chatBox.key("pagedown", () => scroll(Math.floor((this.chatBox.height as number) / 2)));
-
-    // 鼠标滚轮
     this.chatBox.on("wheeldown", () => scroll(3));
     this.chatBox.on("wheelup", () => scroll(-3));
 
+    // ═══════════════════════════════════════════════
     // Esc 清空输入
+    // ═══════════════════════════════════════════════
     this.screen.key("escape", () => {
       if (this.state === "idle") {
         this.inputBox.clearValue();
@@ -651,10 +684,11 @@ class ChatTUI {
       }
     });
 
+    // ═══════════════════════════════════════════════
     // R 键重试（仅在 error 状态时有效）
+    // ═══════════════════════════════════════════════
     this.screen.key("r", () => {
       if (this.state === "error" && this.lastMessage) {
-        // 移除错误卡片
         this.removeAllByType("error");
         this.state = "idle";
         this.screen.render();
@@ -662,13 +696,40 @@ class ChatTUI {
       }
     });
 
-    // 保持输入框焦点
-    this.screen.on("focus", () => this.inputBox.focus());
-
+    // ═══════════════════════════════════════════════
     // 窗口 resize
-    this.screen.on("resize", () => {
-      this.screen.render();
-    });
+    // ═══════════════════════════════════════════════
+    this.screen.on("resize", () => { this.screen.render(); });
+  }
+
+  /** 提取的发送逻辑 — blessed key 事件 + 原始 stdin 兜底共用 */
+  private executeSend(): void {
+    if (this.state !== "idle") return;
+    const text = this.inputBox.getValue().trim();
+    if (!text) {
+      this.flashInputBorder();
+      return;
+    }
+    this.inputBox.clearValue();
+    this.screen.render();
+    this.sendMessage(text);
+  }
+
+  /** 退出 */
+  private executeExit(): void {
+    this.addSystemMessage("{cyan-fg}感谢使用 AI Chat TUI，再见！👋{/cyan-fg}");
+    this.screen.render();
+    setTimeout(() => {
+      this.cleanup();
+      process.exit(0);
+    }, 500);
+  }
+
+  /** 取消生成 */
+  private executeCancel(): void {
+    if (this.state !== "idle" && this.abortController) {
+      this.abortController.abort();
+    }
   }
 
   // ==========================================================

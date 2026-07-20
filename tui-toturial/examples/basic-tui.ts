@@ -156,8 +156,8 @@ async function main() {
   // ──────────────────────────────────────────
   const screen = blessed.screen({
     smartCSR: true,       // 智能光标 —— 只发送变化部分
-    title: "TUI 基础示例 - Basic TUI Demo",
-    cursor: { artificial: true, shape: "line", blink: true, color: "cyan" },
+    fullUnicode: true,    // 完整 Unicode 支持（emoji/CJK）
+    title: "TUI 基础示例",
     useBCE: true,         // 使用背景色擦除
     resizeTimeout: 200,   // resize 事件节流 (ms)
   });
@@ -537,8 +537,9 @@ async function main() {
   // 6. 全局快捷键
   // ──────────────────────────────────────────
 
-  // 退出
-  screen.key("C-q", () => {
+  // 退出（key.ignore=true 阻止焦点组件消费此键）
+  screen.key("C-q", (_ch, key) => {
+    key.ignore = true;
     log("用户退出程序");
     setTimeout(() => process.exit(0), 100);
   });
@@ -548,12 +549,18 @@ async function main() {
     log("按下 Escape 键");
   });
 
-  // 记录按键（除控制键外）
+  // 通用 keypress 监听：Ctrl+Q 兜底 + 记录其他按键
   screen.on("keypress", (ch, key) => {
-    if (key.name === "tab" || key.name === "escape" || key.name === "C-q") return;
+    // Ctrl+Q 兜底（screen.key 匹配失败时的备选）
+    if (key.name === "q" && key.ctrl) {
+      log("用户退出程序");
+      setTimeout(() => process.exit(0), 100);
+      return;
+    }
+    // 过滤控制类按键，避免日志刷屏
+    if (key.name === "tab" || key.name === "escape") return;
     if (ch && /^[\x00-\x1f]$/.test(ch)) return;
     if (["up", "down", "left", "right"].includes(key.name || "")) return;
-    // 可以在这里添加自定义按键处理
   });
 
   // ──────────────────────────────────────────
@@ -568,6 +575,17 @@ async function main() {
     btnOk.focus();
     screen.render();
   }, 100);
+
+  // ── 兜底: 原始 stdin 监听（Windows 下 blessed key 事件可能失效） ──
+  process.stdin.on("data", (raw: Buffer | string) => {
+    const data = typeof raw === "string" ? raw : raw.toString("utf8");
+    for (const ch of data) {
+      if (ch.charCodeAt(0) === 17) { // Ctrl+Q
+        setTimeout(() => process.exit(0), 100);
+        return;
+      }
+    }
+  });
 }
 
 // ──────────────────────────────────────────
