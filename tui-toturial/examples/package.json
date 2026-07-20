@@ -1,0 +1,17 @@
+{
+  "name": "tui-examples",
+  "private": true,
+  "description": "TUI tutorial examples - 终端用户界面教程示例",
+  "scripts": {
+    "basic": "npx tsx basic-tui.ts",
+    "chat": "npx tsx llm-chat.ts"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "@types/blessed": "^0.1.19"
+  }
+}
