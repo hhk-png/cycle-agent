@@ -748,6 +748,8 @@ process.stdin.on('data', (data: Buffer) => {
 
 ## 2.7 终端复用器集成（tmux/screen）
 
+**tmux地址：https://github.com/tmux/tmux**
+
 ### tmux 与 TUI 应用的交互
 
 `tmux` 是终端复用器的行业标准，许多开发者将 TUI 应用运行在 tmux 会话中。这种组合带来了一些需要特别注意的问题。
@@ -1385,27 +1387,5 @@ class CrashRecovery {
 | **崩溃检测标志** | 启动时写 PID，正常退出时删除 |
 | **tmux 守护** | 将 TUI 包装在 tmux 中实现连接/断线重连 |
 | **增量保存** | 只保存变化部分而非完整状态（大对话场景） |
-
-## 最新更新 (2026-07)
-
-本章在原始内容基础上增加了以下扩展：
-
-1. **CJK 字符处理**：新增 2.2.5 节，涵盖双字宽字符检测、CJK 感知的文本截断、对齐、表格布局，以及输入法兼容性
-2. **终端颜色空间管理**：新增 2.2.6 节，包含颜色深度检测与降级、ColorManager 适配器、亮/暗主题调色板、最佳实践
-3. **终端复用器集成**：新增 2.7 节，深度讲解 tmux 的 ANSI 序列转发机制、TrueColor 兼容性、鼠标事件适配、配置最佳实践及 screen 注意事项
-4. **备选缓冲管理**：新增 2.8.1 节，详述备选缓冲原理、控制序列、异常退出保护（AlternateBufferManager 完整实现）、与 tmux 的交互
-5. **终端会话持久化**：新增 2.11 节，包含 tmux 会话管理、SessionManager 完整实现、CrashRecovery 自动恢复、最佳实践表
-
----
-
-**实践：** 在终端中运行以下命令测试您的终端能力：
-
-```bash
-# 256色测试
-curl -s https://raw.githubusercontent.com/termstandard/colors/master/256colors2.pl | bash
-
-# TrueColor 测试
-curl -s https://raw.githubusercontent.com/termstandard/colors/master/24-bit-colors.sh | bash
-```
 
 **下一步：** [第三章：TUI 框架与技术选型](03-tui-frameworks.md)

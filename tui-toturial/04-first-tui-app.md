@@ -937,10 +937,11 @@ debugger.detectExcessiveRenders(60);
    ```
 
 3. **未设置 fullUnicode 导致文字截断**
+   
    ```typescript
    // ❌ 错误：中文/emoji 显示异常
-   const screen = blessed.screen({ smartCSR: true });
-
+const screen = blessed.screen({ smartCSR: true });
+   
    // ✅ 正确：开启 fullUnicode
    const screen = blessed.screen({ smartCSR: true, fullUnicode: true });
    ```
@@ -1071,23 +1072,5 @@ class InputComponent {
 | emoji 显示为方框 | 终端编码不支持 Unicode | 设置 `fullUnicode: true` |
 | 颜色不准确 | TrueColor 不支持 | 回退到 256 色 |
 | 布局错乱 | 窗口大小变化未处理 | 监听 `resize` 事件 |
-
----
-
-## 本章更新日志
-
-| 版本 | 日期 | 更新内容 |
-|------|------|---------|
-| v1.1 | 2026-07 | 新增 4.3.7 组件生命周期钩子 |
-| v1.1 | 2026-07 | 新增 4.3.8 TUI 组件的清理模式 |
-| v1.1 | 2026-07 | 新增 4.3.4.1 事件委托模式 |
-| v1.1 | 2026-07 | 新增 4.4.5 调试 TUI 渲染问题 |
-| v1.1 | 2026-07 | 扩展 4.7 练习，新增进阶练习和综合项目 |
-| v1.1 | 2026-07 | 完善所有代码示例的 TypeScript 类型定义 |
-| v1.1 | 2026-07 | 修复 `as any` 类型转换，使用更精确的类型 |
-| v1.1 | 2026-07 | 为 `list.on('select')` 回调添加显式类型 |
-| v1.0 | 2026-06 | 初版发布 |
-
----
 
 **下一步：** [第五章：大模型对话界面设计](05-llm-ui-design.md)
