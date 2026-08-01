@@ -1,0 +1,26 @@
+{
+  "name": "cycle-iteration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "迭代精炼与教程生成（替代 iterative_refine.sh / tui-tutorial.sh / vllm-tutorial.sh）",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@11.8.0",
+  "scripts": {
+    "start": "node src/run.ts",
+    "dev": "node --watch src/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "cross-spawn": "^7.0.6",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^24.13.3",
+    "typescript": "^7.0.2"
+  }
+}

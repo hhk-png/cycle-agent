@@ -1,0 +1,30 @@
+{
+  "model": {
+    "vocab_size": 97,
+    "n_embd": 96,
+    "n_layer": 3,
+    "n_head": 4,
+    "head_dim": 24,
+    "block_size": 128,
+    "dropout": 0.0,
+    "tie_word_embeddings": true
+  },
+  "cache": {
+    "block_size": 16,
+    "num_gpu_blocks": 64,
+    "num_cpu_blocks": 8
+  },
+  "scheduler": {
+    "max_num_seqs": 8,
+    "max_num_batched_tokens": 512,
+    "enable_chunked_prefill": true,
+    "enable_preemption": true,
+    "preemption_mode": "recompute"
+  },
+  "seed": 0,
+  "dtype": "float32",
+  "quantize": null,
+  "enable_prefix_caching": true,
+  "speculative": false,
+  "max_model_len": 0
+}
