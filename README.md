@@ -17,43 +17,45 @@ pnpm install
 
 ## 用法
 
-入口文件直接执行 claude 命令:
+每个教程的变量保存在一个独立配置文件里(`configs/<配置名>.ts`),运行只从配置加载字段,不再通过命令行传参。
 
 ```bash
-node src/run.ts "<初始描述>" [最大迭代次数]
+node src/run.ts                          # configs/ 下只有一个配置时直用,多个则交互选择
+node src/run.ts <配置名>                 # 运行 configs/<配置名>.ts(如 vllm-toturial)
+node src/run.ts --list                   # 列出 configs/ 下所有已保存的配置
 ```
-
-| 参数 | 说明 | 必填 |
-|---|---|---|
-| `初始描述` | 任意文本描述(必填,缺省时报错退出) | 是 |
-| `最大迭代次数` | 最多跑多少轮(默认 5) | 否 |
 
 ```bash
-# 使用默认 5 轮
-node src/run.ts "你的描述"
-
-# 指定跑 3 轮
-node src/run.ts "你的描述" 3
+# 运行已保存的 vllm 教程配置
+node src/run.ts vllm-toturial
 ```
 
-## 参数在文件里定义
+新建教程 = 复制 `configs/` 下任一配置文件改名,再改里面的字段(标题、目录、描述、轮次、提示词等),然后 `node src/run.ts <新配置名>` 运行。
 
-`src/run.ts` 顶部有一组配置常量,按需修改:
+## 教程配置(configs/ 目录)
+
+每个教程一个文件,内容为完整变量,新老教程的配置都会保留:
 
 ```ts
-const title = '教程迭代';              // 标题
-const targetDir = 'vllm-toturial';     // 目标目录名(同时用于提示词拼接与结束提示)
-const resultLabel = `结果: ./${targetDir}/`;
-const claudeFlags = [/* 固定:--verbose 始终附加 */];
-const startAt = 1;                     // 起始轮次,默认 1
-const defaultMaxIterations = 5;        // 默认最大迭代次数(可用命令行第 2 个参数覆盖)
-const dryRun = false;                  // true 时只打印每轮提示词,不调用 claude(验证用)
-const firstRoundPrompt = `...`;        // 首轮提示词模板,{description}/{targetDir} 会被替换
-const refinePrompt = `...`;            // 精炼轮提示词模板
-const descArg = process.argv[2];       // 初始描述(命令行第 1 个参数)
-const iterArg = process.argv[3];       // 最大迭代次数(命令行第 2 个参数)
+// configs/vllm-toturial.ts
+import type { TutorialConfig } from '../src/config.ts';
+
+const config: TutorialConfig = {
+  title: '教程迭代',            // 标题
+  targetDir: 'vllm-toturial',   // 目标目录名(结果保存到 ./<targetDir>/ 下)
+  claudeFlags: [/* claude 启动参数,默认固定附加 --verbose */],
+  startAt: 1,                   // 起始轮次,默认 1;>1 时全部用精炼模板续跑
+  dryRun: false,                // true 时只打印每轮提示词,不调用 claude(验证用)
+  description: '...',           // 初始描述
+  maxIterations: 10,            // 最大迭代次数
+  firstRoundPrompt: `...`,      // 首轮提示词模板,{description}/{targetDir} 会被替换
+  refinePrompt: `...`,          // 精炼轮提示词模板
+};
+
+export default config;
 ```
 
+新建教程 = 复制一个已有配置文件改名,再按需微调;字段全部来自该文件,运行时不接收命令行参数。
 本工具固定为 tutorial 模式:claude 始终附加 `--verbose`(复现 vllm-tutorial.sh),目标为 `./${targetDir}/`。
 
 ## 运行流程
@@ -76,7 +78,8 @@ const iterArg = process.argv[3];       // 最大迭代次数(命令行第 2 个�
 ## 常用脚本
 
 ```bash
-pnpm start                 # 等价于 node src/run.ts
+pnpm start                 # 运行教程(等价于 node src/run.ts)
+pnpm configs               # 列出 configs/ 下所有已保存的配置
 pnpm typecheck             # tsc --noEmit 类型检查(typescript 7)
 ```
 

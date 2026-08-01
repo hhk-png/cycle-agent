@@ -46,11 +46,13 @@ export function runClaude(
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       stdout += text;
-      hooks.onData?.(text);
+      hooks.onStdout?.(text);
     });
 
     child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+      hooks.onStderr?.(text);
     });
 
     // spawn 失败也走 resolve
