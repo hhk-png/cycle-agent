@@ -1,0 +1,4 @@
+{
+  "chars": "\t\n !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^`abcdefghijklmnopqrstuvwxyz{|}~",
+  "eos_token_id": 96
+}
