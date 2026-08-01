@@ -1,4 +1,5 @@
 import pc from 'picocolors';
+import path from 'node:path';
 import { killActiveClaude, runClaude } from './claude.ts';
 import {
   isTTY,
@@ -6,51 +7,73 @@ import {
   stopSpinnerActive,
   header,
   roundHeader,
+  success,
   error,
   info,
   dim,
 } from './ui.ts';
-import { mkdir, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import {
+  hasConfig,
+  listConfigNames,
+  loadConfig,
+  pickConfig,
+  type TutorialConfig,
+} from './config.ts';
 
-const title = '教程迭代';
-const targetDir = 'vllm-toturial'; // 目标目录名
-const resultLabel = `结果: ./${targetDir}/`;
-const claudeFlags = [
-  '-p',
-  '--output-format',
-  'text',
-  '--effort',
-  'high',
-  '--dangerously-skip-permissions',
-  '--verbose',
-];
-const startAt = 1; // 起始轮次,默认 1
-const dryRun = false; // true 时只打印每轮提示词, 不调用 claude（验证用）
-
-const descArg =
-  process.argv[2]
-  ?? '生成一个vllm的教程，以章节的形式呈现，使用markdown。并且在其中需要包括一个简版的vllm的实现，这个实现需要按照工程化的思路实现，要包含vllm的所有的内容，并且可以运行，这个需要写完之后验证。教程也要包括所有的内容，现在的实现以及未来的方向和实现。尽可能的包括全部的信息'; // 初始描述（命令行第 1 个参数）
-const iterArg = Number(process.argv[3]) || 10; // 最大迭代次数（命令行第 2 个参数）
-
-const firstRoundPrompt = `用户初始描述：{description}
-
-请根据上述描述生成完整的教程。为了教程更完美，可以适当的删减、增加和修改章节和章节的内容。
-直接输出最终内容，并将内容保存到 {targetDir} 目录下。
-只能操作 {targetDir} 目录下的文件，不能操作其他目录下的文件。`;
-
-const refinePrompt = `用户初始描述：{description}
-请读取 {targetDir} 目录下的文件章节内容，在此基础上结合用户的输入进一步细化和完善，输出更详细的版本。可以适当的删减、增加和修改章节和章节的内容，使教程更完美，章节所覆盖的内容更完善。
-直接输出最终内容，并将内容保存到 {targetDir}目录下。
-每次先检查章节，看有没有可以增加和删除、修改的章节，如果有，可以对章节进行操作。
-只能操作 {targetDir} 目录下的文件，不能操作其他目录下的文件。`;
-
-mkdirSync(targetDir, { recursive: true });
-
+/**
+ * 运行只从 configs/ 下的配置文件加载字段,不接收任何任务参数。
+ * 每个教程一个文件(configs/<配置名>.ts),新建教程 = 复制一份配置文件再改。
+ *
+ * 用法:
+ *   node src/run.ts               # configs/ 下唯一配置直用,多个则交互选择
+ *   node src/run.ts <配置名>      # 运行 configs/<配置名>.ts 里的字段
+ *   node src/run.ts --list        # 列出 configs/ 下所有配置
+ */
 async function main(): Promise<number> {
-  const interactive = isTTY();
+  const args = process.argv.slice(2);
 
-  const description = descArg;
-  const maxIterations = iterArg;
+  if (args[0] === '--list') {
+    const names = listConfigNames();
+    if (names.length === 0) info('configs/ 下还没有配置文件,复制 configs/ 下任一文件改名即可新建');
+    else names.forEach((n) => info(`  ${n}`));
+    return 0;
+  }
+
+  if (args.length > 1) {
+    error('用法: node src/run.ts [配置名]');
+    return 1;
+  }
+
+  const configName = args[0];
+  let config: TutorialConfig;
+
+  if (configName) {
+    if (!hasConfig(configName)) {
+      error(`configs/ 下没有配置: ${configName}(可用 node src/run.ts --list 查看)`);
+      return 1;
+    }
+    config = await loadConfig(configName);
+  } else {
+    config = await pickConfig();
+  }
+
+  if (!config.description) {
+    error('配置缺少初始描述,请在 configs/ 的配置文件里补充 description');
+    return 1;
+  }
+  if (config.targetDir.includes('..') || path.isAbsolute(config.targetDir)) {
+    error(`targetDir 不合法: ${config.targetDir}`);
+    return 1;
+  }
+
+  const interactive = isTTY();
+  const { title, targetDir, claudeFlags, startAt, dryRun, firstRoundPrompt, refinePrompt } = config;
+  const description = config.description;
+  const maxIterations = config.maxIterations;
+  const resultLabel = `结果: ./${targetDir}/`;
+
+  mkdirSync(targetDir, { recursive: true });
 
   header(title);
   dim(`  描述: ${truncate(description, 60)}`);
@@ -75,20 +98,40 @@ async function main(): Promise<number> {
     const sp = interactive ? startSpinner(`第 ${i} 轮 · Claude 生成中`) : null;
     if (!interactive) dim(`▶ 第 ${i} 轮 · Claude 调用中 …`);
 
+    // claude 一开始输出就停掉 spinner,转为实时流式打印
+    let streaming = false;
+    const streamStart = (): void => {
+      if (!streaming) {
+        streaming = true;
+        stopSpinnerActive();
+      }
+    };
+
     const t0 = performance.now();
     const res = await runClaude(claudeFlags, prompt, {
-      onData: (chunk) => sp?.update(Buffer.byteLength(chunk)),
+      onStdout: (chunk) => {
+        streamStart();
+        process.stdout.write(chunk);
+      },
+      onStderr: (chunk) => {
+        streamStart();
+        process.stderr.write(chunk);
+      },
     });
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
 
     if (res.exitCode === 0) {
-      sp?.stopSuccess(`✔ 第 ${i} 轮完成（${secs}s）`);
-      // --verbose 的日志走 claude 的 stderr,这里一并打印
-      if (res.stderr.trim()) console.error(res.stderr.trimEnd());
-      if (res.stdout.trim()) info(res.stdout.trimEnd());
+      if (streaming) {
+        success(`✔ 第 ${i} 轮完成（${secs}s）`);
+      } else {
+        sp?.stopSuccess(`✔ 第 ${i} 轮完成（${secs}s）`);
+        if (res.stdout.trim()) info(res.stdout.trimEnd());
+      }
     } else {
-      sp?.stopError(`✖ 第 ${i} 轮失败`);
-      if (res.stderr.trim()) console.error(pc.red(res.stderr.trimEnd().slice(-500)));
+      if (!streaming) {
+        sp?.stopError(`✖ 第 ${i} 轮失败`);
+        if (res.stderr.trim()) console.error(pc.red(res.stderr.trimEnd().slice(-500)));
+      }
       error(`✖ 第 ${i} 轮失败，退出`);
       return 1;
     }

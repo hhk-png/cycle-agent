@@ -10,28 +10,18 @@ export function isTTY(): boolean {
 let timer: ReturnType<typeof setInterval> | null = null;
 let active: ReturnType<typeof spinner> | null = null;
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n}B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
-  return `${(n / 1024 / 1024).toFixed(1)}MB`;
-}
-
-/** 启动 clack spinner,并周期性刷新「标签 · 字节数 · 已用秒数」 */
+/** 启动 clack spinner,并周期性刷新「标签 · 已用秒数」 */
 export function startSpinner(label: string): SpinnerHandle {
   const start = performance.now();
-  let bytes = 0;
 
   active = spinner();
   active.start(label);
   timer = setInterval(() => {
     const secs = Math.floor((performance.now() - start) / 1000);
-    active?.message(`${label} · ${formatBytes(bytes)} · ${secs}s`);
+    active?.message(`${label} · ${secs}s`);
   }, 100);
 
   return {
-    update(b: number) {
-      bytes += b;
-    },
     stopSuccess(msg: string) {
       clearTimer();
       active?.stop(pc.green(msg));
