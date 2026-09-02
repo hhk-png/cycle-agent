@@ -1,0 +1,20 @@
+{
+  "name": "mini-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "mini-agent —— 零依赖、工程化的简版 AI Agent（TypeScript 实现），《AI Agent 完全教程》配套代码。",
+  "engines": {
+    "node": ">=23.6.0"
+  },
+  "scripts": {
+    "test": "node --test \"tests/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "example:chat": "node examples/chat.ts",
+    "example:math": "node examples/math-agent.ts",
+    "example:team": "node examples/team.ts",
+    "example:mcp": "node examples/mcp-demo.ts",
+    "example:eval-support": "node examples/eval-support.ts",
+    "mcp-server": "node examples/mock-mcp-server.ts"
+  }
+}

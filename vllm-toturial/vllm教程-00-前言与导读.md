@@ -173,7 +173,7 @@ vllm-toturial/
 先安装依赖并进入目录：
 
 ```bash
-git clone <本教程所在仓库>   # 或直接进入已有的 vllm-toturial/
+git clone git@github.com:hhk-png/cycle-agent.git   # 或直接进入已有的 vllm-toturial/
 cd vllm-toturial/mini-vllm
 pip install numpy fastapi uvicorn httpx pytest   # 或 pip install -e .[test]（见 pyproject.toml）
 ```
