@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 第 4 章：快速上手
 
 > 目标：用 10 分钟跑通 vLLM 的两种使用方式——**离线批量推理**（`LLM` 类）和**在线服务**（OpenAI 兼容服务器）。这一章的内容在真实 vLLM 与教程自带的 mini-vLLM 上几乎一一对应。

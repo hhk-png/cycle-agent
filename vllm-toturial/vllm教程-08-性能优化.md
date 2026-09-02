@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 08 · vLLM 性能优化：PagedAttention、显存与推理调优
 
 > 本章覆盖 vLLM 性能的核心：PagedAttention 内核为什么快、KV cache 显存怎么算、CUDA Graph 是什么、连续批处理的吞吐/延迟权衡，以及投机解码、并行度与基准测试方法。目标是让你知道每个 flag 到底改了什么东西。

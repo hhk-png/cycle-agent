@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 第 6 章：从零实现一个简化版 vLLM（mini-vLLM）
 
 > 这一章是教程的核心。我们用 **纯 NumPy** 从零写一个可以真正运行的最小 vLLM——包括 PagedAttention、连续批处理调度、前缀缓存、抢占、分块 prefill、OpenAI 兼容服务器、量化演示和投机解码演示。代码全部在 `vllm-toturial/mini-vllm/`，可以在 CPU 上跑通。

@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 16 · 附录 A：环境变量与参数参考
 
 > 本章是全教程的"查手册"章节：把 vLLM 的 **环境变量（Environment Variables）** 与 **命令行参数（CLI flags / EngineArgs）** 按主题整理成可检索的参考表。不追求死记硬背，而是在遇到"为什么行为不一样""怎么调出某种行为"时知道去哪里找。

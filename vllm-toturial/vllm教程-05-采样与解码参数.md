@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 第 5 章：采样与解码参数
 
 > 本章目标：把"模型怎么选下一个 token"这件事讲透。你会理解 temperature / top-k / top-p / 各类惩罚项背后的数学直觉，掌握 beam search、`n` / `best_of`、logprobs、种子复现，以及引导解码（结构化输出）的机制。这些参数是日常调优 LLM 服务最常碰到的旋钮，值得一次弄明白。

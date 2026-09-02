@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 11 · 生态与集成
 
 ## 11.1 Hugging Face 生态

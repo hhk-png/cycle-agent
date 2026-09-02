@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 03 · vLLM 架构设计：从 HTTP 请求到 Token
 
 > 本章从宏观到微观梳理 vLLM 的系统架构：引擎如何组织调度循环，各组件（Scheduler、BlockManager、ModelRunner、Worker）各自负责什么，分布式并行如何切分模型，以及一个请求在整条流水线中的完整生命周期。理解这张地图之后，读代码和调参数都会有抓手。

@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 02 核心原理
 
 > 本章目标：深入拆解 vLLM 高性能背后的每一个关键机制。每个概念都按 **为什么（motivation）→ 怎么做（mechanism）→ 具体例子** 展开。

@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 01 认识 vLLM
 
 > 本章目标：弄清楚 vLLM 是什么、它解决了什么问题、有哪些关键特性、与其他推理框架的差异，以及什么时候该用它。

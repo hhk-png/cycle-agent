@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 19 · 模型架构基础：注意力变体、位置编码与 vLLM 支持
 
 > 本章目标：把 vLLM 服务的那"一堆模型"讲清楚。前几章反复出现的 `num_kv_heads`、`head_dim`、GQA、MLA、RoPE、MoE 等术语，在这里一次性系统讲透——它们直接决定 **KV cache 大小、attention 内核怎么写、模型能不能塞进一张卡**。读完本章，你会明白"为什么 70B 模型的 KV 只比 8B 大 2.5 倍""为什么 DeepSeek-V3 的 KV cache 那么小""为什么 vLLM 要对不同模型写不同的内核"。这也是一份可以按需查阅的**模型架构速查手册**。

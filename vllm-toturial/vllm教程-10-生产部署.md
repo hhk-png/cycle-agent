@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # 10 · 生产部署
 
 ## 10.1 以 OpenAI 兼容服务部署

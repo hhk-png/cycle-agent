@@ -1,3 +1,5 @@
+仓库地址：https://github.com/hhk-png/cycle-agent
+
 # mini-vLLM
 
 一个用**纯 NumPy** 实现的、可运行的 vLLM 简化版。它完整复刻了 vLLM 的
