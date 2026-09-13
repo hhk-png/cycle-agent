@@ -1,3 +1,16 @@
 .claude/
 node_modules/
 __pycache__
+
+# 掘金发布:凭据与状态(含 sessionid,绝不能进仓库)
+.juejin-cookie
+.juejin-publish-state*.json
+
+# 微信发布:凭据、状态与产物(AppSecret 与 sessionid 同级,绝不能进仓库)
+.wechat-secret
+.wechat-publish-state*.json
+.wechat-out/
+
+.env
+# 迭代产出的日志,里面出现过 API 密钥,不能进仓库
+result.md

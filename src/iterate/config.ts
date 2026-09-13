@@ -2,9 +2,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { select } from '@clack/prompts';
-import { isTTY } from './ui.ts';
+import { isTTY } from '../shared/ui.ts';
 
-/** 单个教程的完整配置;每个 configs/<名称>.ts 文件默认导出一个该对象 */
+/** 单个教程的完整配置;每个 src/iterate/configs/<名称>.ts 文件默认导出一个该对象 */
 export interface TutorialConfig {
   /** 终端标题 */
   title: string;
@@ -26,13 +26,13 @@ export interface TutorialConfig {
   refinePrompt: string;
 }
 
-export const configsDir = path.resolve(process.cwd(), 'configs');
+export const configsDir = path.resolve(process.cwd(), 'src', 'iterate', 'configs');
 
 export function configFileName(name: string): string {
   return path.join(configsDir, `${name}.ts`);
 }
 
-/** 列出 configs/ 下已有的配置名(文件名去掉 .ts) */
+/** 列出 src/iterate/configs/ 下已有的配置名(文件名去掉 .ts) */
 export function listConfigNames(): string[] {
   if (!existsSync(configsDir)) return [];
   return readdirSync(configsDir)
@@ -57,7 +57,7 @@ export async function loadConfig(name: string): Promise<TutorialConfig> {
 export async function pickConfig(): Promise<TutorialConfig> {
   const names = listConfigNames();
   if (names.length === 0) {
-    throw new Error('configs/ 下还没有配置文件,复制 configs/ 下任一文件改名即可新建');
+    throw new Error('src/iterate/configs/ 下还没有配置文件,复制 src/iterate/configs/ 下任一文件改名即可新建');
   }
   if (names.length === 1) return loadConfig(names[0]);
 
@@ -69,5 +69,5 @@ export async function pickConfig(): Promise<TutorialConfig> {
     if (typeof name !== 'string' || !name) process.exit(130);
     return loadConfig(name);
   }
-  throw new Error(`configs/ 下有多个配置(${names.join(', ')}),请显式指定配置名`);
+  throw new Error(`src/iterate/configs/ 下有多个配置(${names.join(', ')}),请显式指定配置名`);
 }

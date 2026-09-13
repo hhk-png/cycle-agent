@@ -1,6 +1,6 @@
 import spawn from 'cross-spawn';
 import { spawnSync } from 'node:child_process';
-import type { ClaudeResult, ClaudeHooks } from './types.ts';
+import type { ClaudeResult, ClaudeHooks } from '../shared/types.ts';
 
 let activeChild: ReturnType<typeof spawn> | null = null;
 

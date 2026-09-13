@@ -9,14 +9,24 @@
   },
   "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "start": "node src/run.ts",
-    "dev": "node --watch src/run.ts",
-    "configs": "node src/run.ts --list",
+    "start": "node src/iterate/run.ts",
+    "dev": "node --watch src/iterate/run.ts",
+    "configs": "node src/iterate/run.ts --list",
+    "publish": "node src/publish/juejin.ts",
+    "publish:list": "node src/publish/juejin.ts --list",
+    "publish:cookie": "node src/publish/set-cookie.ts",
+    "wechat": "node src/publish/wechat.ts",
+    "wechat:list": "node src/publish/wechat.ts --list",
+    "wechat:build": "node src/publish/wechat.ts --build",
+    "wechat:plan": "node src/publish/wechat.ts --plan",
+    "wechat:check": "node src/publish/wechat.ts --check",
+    "wechat:drafts": "node src/publish/wechat.ts --drafts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
     "cross-spawn": "^7.0.6",
+    "marked": "^18.0.12",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {

@@ -4,14 +4,16 @@ import { killActiveClaude, runClaude } from './claude.ts';
 import {
   isTTY,
   startSpinner,
+  startStreamClock,
   stopSpinnerActive,
+  stopStreamClockActive,
   header,
   roundHeader,
   success,
   error,
   info,
   dim,
-} from './ui.ts';
+} from '../shared/ui.ts';
 import { mkdirSync } from 'node:fs';
 import {
   hasConfig,
@@ -22,26 +24,26 @@ import {
 } from './config.ts';
 
 /**
- * 运行只从 configs/ 下的配置文件加载字段,不接收任何任务参数。
- * 每个教程一个文件(configs/<配置名>.ts),新建教程 = 复制一份配置文件再改。
+ * 运行只从 src/iterate/configs/ 下的配置文件加载字段,不接收任何任务参数。
+ * 每个教程一个文件(src/iterate/configs/<配置名>.ts),新建教程 = 复制一份配置文件再改。
  *
  * 用法:
- *   node src/run.ts               # configs/ 下唯一配置直用,多个则交互选择
- *   node src/run.ts <配置名>      # 运行 configs/<配置名>.ts 里的字段
- *   node src/run.ts --list        # 列出 configs/ 下所有配置
+ *   node src/iterate/run.ts               # src/iterate/configs/ 下唯一配置直用,多个则交互选择
+ *   node src/iterate/run.ts <配置名>      # 运行 src/iterate/configs/<配置名>.ts 里的字段
+ *   node src/iterate/run.ts --list        # 列出 src/iterate/configs/ 下所有配置
  */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
 
   if (args[0] === '--list') {
     const names = listConfigNames();
-    if (names.length === 0) info('configs/ 下还没有配置文件,复制 configs/ 下任一文件改名即可新建');
+    if (names.length === 0) info('src/iterate/configs/ 下还没有配置文件,复制 src/iterate/configs/ 下任一文件改名即可新建');
     else names.forEach((n) => info(`  ${n}`));
     return 0;
   }
 
   if (args.length > 1) {
-    error('用法: node src/run.ts [配置名]');
+    error('用法: node src/iterate/run.ts [配置名]');
     return 1;
   }
 
@@ -50,7 +52,7 @@ async function main(): Promise<number> {
 
   if (configName) {
     if (!hasConfig(configName)) {
-      error(`configs/ 下没有配置: ${configName}(可用 node src/run.ts --list 查看)`);
+      error(`src/iterate/configs/ 下没有配置: ${configName}(可用 node src/iterate/run.ts --list 查看)`);
       return 1;
     }
     config = await loadConfig(configName);
@@ -59,7 +61,7 @@ async function main(): Promise<number> {
   }
 
   if (!config.description) {
-    error('配置缺少初始描述,请在 configs/ 的配置文件里补充 description');
+    error('配置缺少初始描述,请在 src/iterate/configs/ 的配置文件里补充 description');
     return 1;
   }
   if (config.targetDir.includes('..') || path.isAbsolute(config.targetDir)) {
@@ -98,7 +100,14 @@ async function main(): Promise<number> {
     const sp = interactive ? startSpinner(`第 ${i} 轮 · Claude 生成中`) : null;
     if (!interactive) dim(`▶ 第 ${i} 轮 · Claude 调用中 …`);
 
-    // claude 一开始输出就停掉 spinner,转为实时流式打印
+    // claude 一开始输出就停掉 spinner,转为实时流式打印。
+    // 但**不能连耗时一起丢掉**:spinner 拆了之后整轮就没时间参考了,所以
+    // 顺手接上 streamClock —— 它在「正文刚写完一行」时补一行「已用 Xs」,
+    // 下一段正文到达前自己擦掉,与流式正文不打架。
+    //
+    // ⚠️ 分片要交给 clock.write() 去写,不要自己再 write 一遍 ——
+    // 擦进度、写正文、补进度这三步的顺序是它保证的。
+    const clock = startStreamClock(`第 ${i} 轮`);
     let streaming = false;
     const streamStart = (): void => {
       if (!streaming) {
@@ -111,13 +120,14 @@ async function main(): Promise<number> {
     const res = await runClaude(claudeFlags, prompt, {
       onStdout: (chunk) => {
         streamStart();
-        process.stdout.write(chunk);
+        clock.write(chunk);
       },
       onStderr: (chunk) => {
         streamStart();
-        process.stderr.write(chunk);
+        clock.write(chunk, 'stderr');
       },
     });
+    clock.stop(); // 先擦掉行尾的进度,免得被下面的完成信息盖住半行
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
 
     if (res.exitCode === 0) {
@@ -149,6 +159,7 @@ function truncate(s: string, max: number): string {
 
 process.on('SIGINT', () => {
   stopSpinnerActive();
+  stopStreamClockActive();
   killActiveClaude();
   console.log(pc.red('✖ 已中断'));
   process.exit(130);
