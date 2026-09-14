@@ -1,0 +1,95 @@
+====================================================================
+第五轮修订后的完整验证记录（2026-09-14）
+环境：Windows 11 + Python 3.14.6 + NumPy 2.5.1（无 GPU）
+====================================================================
+
+【命令 ①】python -m pytest tests/ -q
+--------------------------------------------------------------------
+........................................................................ [ 48%]
+........................................................................ [ 97%]
+....                                                                     [100%]
+PYTEST_EXIT=0
+
+  进度点合计 148 个（72 + 72 + 4），与 10 个测试文件里的
+  `def test_` 计数 7+15+30+19+11+6+9+6+15+30 = 148 完全一致。
+  输出中**没有任何 F（失败）**；唯一的 'E' 字符来自本文件自己
+  最后一行 "PYTEST_EXIT=0" 里的 E，不是 pytest 的 error 标记。
+
+【命令 ②】for f in examples/*.py; do python "$f"; done
+--------------------------------------------------------------------
+examples/01_hello_ray.py              exit=0
+examples/02_dependencies.py           exit=0
+examples/03_actors.py                 exit=0
+examples/04_object_store.py           exit=0
+examples/05_scheduling.py             exit=0
+examples/06_fault_tolerance.py        exit=0
+examples/07_streaming_generators.py   exit=0
+examples/08_local_mode_and_debug.py   exit=0
+examples/09_observability.py          exit=0
+examples/10_parameter_server.py       exit=0
+examples/11_end_to_end.py             exit=0
+examples/12_queue_pipeline.py         exit=0
+FAILED=0                             （12/12 全部 exit=0）
+
+【命令 ③】python mini-ray/tools/check_docs.py
+--------------------------------------------------------------------
+文档侧自检（37 篇正文 + 1 个 README）
+  章节数 37（00-36，连续无跳号）
+  代码围栏未闭合 0
+  悬空章号引用 0
+  悬空 §小节引用 0
+  失效本地链接 0
+  表格列数不一致 0
+  自述测试数唯一 [148]
+  自述示例数唯一 [12]
+结果：全部通过                             （exit 0）
+
+====================================================================
+本轮对 mini-ray 源码的改动（诚实说明）
+--------------------------------------------------------------------
+只有 **3 处 docstring**，零行行为代码改动：
+
+  1. miniray/scheduling_strategies.py 模块 docstring ——
+     原文把 `scheduling_strategy="SPREAD"` 写成了可用示例，实际传字符串
+     直接抛 `MiniRayError: 不认识的调度策略`（已实跑确认）。
+  2. 同上，模块 docstring 的"局限"段 —— 新增两条与真实 Ray 的差异登记。
+  3. NodeAffinitySchedulingStrategy 的 docstring ——
+     原文说 `soft=True` "等不到就退回普通调度"，实际**未实现回退**，
+     调度器无条件硬过滤（已读 raylet.py / scheduler.py 确认）。
+
+  这正是上表 ①②③ 三条能在**不改行为**的前提下全绿的原因。
+
+====================================================================
+本轮未做（诚实说明，与前四轮口径一致）
+--------------------------------------------------------------------
+- **未在真实 Ray（2.58）上跑任何示例**。本机未安装 Ray，Python 3.14 的
+  兼容性未验证。教程里 Ray 侧的行为描述基于**对 ray-2.58.0 tag 源码的
+  逐行核对**（ray_config_def.h / state.py / scripts.py / exceptions.py /
+  compute.py / read_api.py / ax_search.py / tune/constants.py /
+  air/config.py / worker.py 等）与官方文档，属"**文档级准确**"，
+  不是"在本机跑过"。正文中已逐处标注来源；查不到的一律写"未确认"。
+- **未验证 GPU / 多机 / K8s** 相关章节（本机无 GPU、无集群）。
+- 第 34–36 章的 XGBoost / LightGBM / MLflow / OpenTelemetry 示例
+  均**未在本机安装对应库**。
+- `memray attach --stop`、`AxSearch.save/restore`、peft 的
+  `adapter_name` 冲突细节等，是依据官方文档/源码摘要判定的，
+  已在正文标注置信度。
+- 仍有一批条目标着"未确认"：RDT 的 alpha 宣告版本、
+  topology-aware 的 2.56/2.57 归属、autoscaler v2 的官方宣告、
+  弹性伸缩的完整语义、`fallback_strategy` 的取值、
+  `RAY_DEBUG_POST_MORTEM` 在 Ray 源码中的读取点。
+  **它们是诚实的空白，不是遗漏。**
+
+====================================================================
+本轮"回源码核对后决定不改"的 2 条（记账备查）
+--------------------------------------------------------------------
+1. 审计报告称 `CheckpointConfig.checkpoint_frequency` 在 2.58 已弃用
+   （PR #58022）。实测 `ray/air/config.py`：它是普通字段
+   （`checkpoint_frequency: Optional[int] = 0`）、`checkpoint_at_end`
+   同理，**都没有弃用告警**；只有 `_checkpoint_keep_all_ranks` 与
+   `_checkpoint_upload_from_workers` 是 `_DEPRECATED_VALUE`。
+   → **不改**（改了反而引入错误）。
+2. 审计报告称 `AxSearch` 不支持保存/恢复。实测 2.58 的
+   `ray/tune/search/ax/ax_search.py` 第 468/473 行有真实的
+   `save(checkpoint_path)` / `restore(checkpoint_path)`。
+   → 第 14 章按事实改为"**已实现**"。

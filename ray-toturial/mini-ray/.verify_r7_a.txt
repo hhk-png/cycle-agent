@@ -1,0 +1,19 @@
+### 1) pytest
+........................................................................ [ 41%]
+........................................................................ [ 82%]
+..............................                                           [100%]
+PYTEST_EXIT=0
+
+### 2) examples
+examples/01_hello_ray.py exit=0
+examples/02_dependencies.py exit=0
+examples/03_actors.py exit=0
+examples/04_object_store.py exit=0
+examples/05_scheduling.py exit=0
+examples/06_fault_tolerance.py exit=0
+examples/07_streaming_generators.py exit=0
+examples/08_local_mode_and_debug.py exit=0
+examples/09_observability.py exit=0
+examples/10_parameter_server.py exit=0
+examples/11_end_to_end.py exit=0
+examples/12_queue_pipeline.py exit=0

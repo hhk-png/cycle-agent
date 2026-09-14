@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-ray"
+version = "0.1.0"
+description = "A readable, runnable, engineered re-implementation of the Ray distributed computing architecture"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+miniray = "miniray.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# worker 进程是 spawn 出来的子进程,输出会交叉;测试里禁用缓存写入
+cache_dir = ".pytest_cache"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.setuptools]
+packages = ["miniray", "miniray.util", "miniray._private"]

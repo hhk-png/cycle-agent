@@ -1,0 +1,34 @@
+### 1) pytest
+........................................................................ [ 41%]
+........................................................................ [ 82%]
+..............................                                           [100%]
+PYTEST_EXIT=0
+
+### 2) examples
+examples/01_hello_ray.py exit=0
+examples/02_dependencies.py exit=0
+examples/03_actors.py exit=0
+examples/04_object_store.py exit=0
+examples/05_scheduling.py exit=0
+examples/06_fault_tolerance.py exit=0
+examples/07_streaming_generators.py exit=0
+examples/08_local_mode_and_debug.py exit=0
+examples/09_observability.py exit=0
+examples/10_parameter_server.py exit=0
+examples/11_end_to_end.py exit=0
+examples/12_queue_pipeline.py exit=0
+
+### 3) check_docs
+文档侧自检（39 篇正文 + 2 个 README）
+====================================================================
+  章节数 39（00-38，连续无跳号）
+  代码围栏未闭合 0
+  悬空章号引用 0
+  悬空 §小节引用 0
+  失效本地链接 0
+  表格列数不一致 0
+  自述测试数唯一 [174]
+  自述示例数唯一 [12]
+====================================================================
+结果：全部通过
+CHECK_EXIT=0
