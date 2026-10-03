@@ -6,59 +6,53 @@ import { run as runJuejin } from './juejin.ts';
 import { run as runWechat } from './wechat.ts';
 
 /**
- * **唯一的发布入口。** 掘金和微信两套流程都从这里进,第一个参数选平台。
+ * **The single publish entry point**: the first argument selects the platform.
  *
- *   node src/publish/publish.ts juejin [配置名] [选项…]
- *   node src/publish/publish.ts wechat [配置名] [选项…]
+ *   node src/publish/publish.ts juejin [configName] [options…]
+ *   node src/publish/publish.ts wechat [configName] [options…]
  *
- * 为什么只有一个入口:两个平台的状态、锁、摘要来源、封面处理方式各不相同,
- * 但**跑起来的节奏是一样的** —— 先 --list 校验、再建草稿、第 1 篇停下看排版、
- * 然后 --yes 跑完。收成一个入口,这条节奏就只有一处可选错。
- *
- * 平台参数还接受别名:jj / 掘金、wx / 微信。
- *
- * 完整流程见 src/publish/README.md。
+ * Both platforms differ in state, locks, digests and covers, but share one rhythm
+ * (--list → drafts → stop after the 1st → --yes), so a single entry leaves one place
+ * to get it wrong. Aliases: jj / wx(plus the Chinese names, see ALIASES). Full flow: src/publish/README.md.
  */
 
-/** 两个平台的别名 */
+/** Aliases for the two platforms */
 const ALIASES: Record<string, 'juejin' | 'wechat'> = {
   juejin: 'juejin',
   jj: 'juejin',
-  掘金: 'juejin',
   wechat: 'wechat',
   wx: 'wechat',
-  微信: 'wechat',
 };
 
 export function usage(): string {
   const juejinConfigs = listPublishConfigNames();
   const wechatConfigs = listWechatConfigNames();
   return [
-    '用法: node src/publish/publish.ts <平台> [配置名] [选项…]',
+    'Usage: node src/publish/publish.ts <platform> [configName] [options…]',
     '',
-    '平台:',
-    '  juejin, jj, 掘金      发布到掘金(建草稿 / 发布 / 同步)',
-    '  wechat, wx, 微信      发布到微信公众号(只能建草稿)',
+    'Platforms:',
+    '  juejin, jj      publish to Juejin (create drafts / publish / sync)',
+    '  wechat, wx      publish to a WeChat Official Account (drafts only)',
     '',
-    `掘金配置: ${juejinConfigs.join(', ') || '(无)'}`,
-    `微信配置: ${wechatConfigs.join(', ') || '(无)'}`,
+    `Juejin configs: ${juejinConfigs.join(', ') || '(none)'}`,
+    `WeChat configs: ${wechatConfigs.join(', ') || '(none)'}`,
     '',
-    '典型流程(以 ai-agent-toturial 为例):',
-    '  1. 校验摘要与配置      node src/publish/publish.ts juejin ai-agent-toturial --list',
-    '  2. 只建草稿(不公开)  node src/publish/publish.ts juejin ai-agent-toturial --drafts-only',
-    '     ↳ 第 1 篇建好后会停下,去编辑器里设封面、看排版',
-    '  3. 继续建完剩下的      node src/publish/publish.ts juejin ai-agent-toturial --drafts-only --yes',
-    '  4. 发布                node src/publish/publish.ts juejin ai-agent-toturial --yes',
-    '  5. 改了摘要/标题后同步  node src/publish/publish.ts juejin ai-agent-toturial --sync',
+    'Typical flow (using ai-agent-toturial as an example):',
+    '  1. Validate digests and config  node src/publish/publish.ts juejin ai-agent-toturial --list',
+    '  2. Create drafts only (not public)  node src/publish/publish.ts juejin ai-agent-toturial --drafts-only',
+    '     ↳ After the 1st one is created it stops, so you can set the cover and check the layout in the editor',
+    '  3. Finish the rest      node src/publish/publish.ts juejin ai-agent-toturial --drafts-only --yes',
+    '  4. Publish              node src/publish/publish.ts juejin ai-agent-toturial --yes',
+    '  5. Sync after changing digests/titles  node src/publish/publish.ts juejin ai-agent-toturial --sync',
     '',
-    '微信侧同理,把 juejin 换成 wechat(它没有发布接口,到草稿为止):',
+    'The WeChat side is the same, just replace juejin with wechat (it has no publish API, so it stops at drafts):',
     '  node src/publish/publish.ts wechat wechat-ai-agent --list',
     '  node src/publish/publish.ts wechat wechat-ai-agent --drafts',
     '',
-    '各平台自己的选项(用 --help 看详情):',
-    '  掘金: --list --categories --tags <词> --suggest-briefs --dry-run --drafts-only',
+    "Each platform's own options (use --help for details):",
+    '  Juejin: --list --categories --tags <word> --suggest-briefs --dry-run --drafts-only',
     '        --yes --from NN --to NN --only NN --sync --republish NN --force --orphans',
-    '  微信: --list --build --plan --check --drafts --ip --only NN --force --yes',
+    '  WeChat: --list --build --plan --check --drafts --ip --only NN --force --yes',
   ].join('\n');
 }
 
@@ -66,14 +60,14 @@ async function main(): Promise<number> {
   const argv = process.argv.slice(2);
 
   if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
-    // 没有平台参数不是错误,是要看用法 —— 用 stdout,别让 shell 以为失败了
+    // No platform argument is not an error, it means you want the usage — use stdout, so the shell doesn't think it failed
     console.log(usage());
     return argv.length === 0 ? 1 : 0;
   }
 
   const platform = ALIASES[argv[0]];
   if (!platform) {
-    error(`不认识的平台: ${argv[0]}(可用: juejin / wechat)`);
+    error(`Unknown platform: ${argv[0]}(available: juejin / wechat)`);
     console.log(usage());
     return 1;
   }
@@ -87,11 +81,11 @@ async function main(): Promise<number> {
   return platform === 'juejin' ? runJuejin(rest) : runWechat(rest);
 }
 
-// SIGINT 只在这里注册一次 —— 两个平台各注册一份的话,同一个 Ctrl-C 会触发两遍。
-// 不在信号处理器里写状态文件(写盘竞态);靠「每完成一步即落盘」保证可续跑。
+// Register SIGINT once: per-platform handlers would fire twice on one Ctrl-C. Don't write
+// state here(disk-write race) — each completed step saves, keeping runs resumable.
 process.on('SIGINT', () => {
   stopSpinnerActive();
-  console.log(pc.red('✖ 已中断'));
+  console.log(pc.red('✖ Interrupted'));
   process.exit(130);
 });
 
@@ -100,6 +94,6 @@ main()
     process.exitCode = code;
   })
   .catch((err: unknown) => {
-    error(`未预期的错误: ${(err as Error).message}`);
+    error(`Unexpected error: ${(err as Error).message}`);
     process.exitCode = 1;
   });

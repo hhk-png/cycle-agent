@@ -8,74 +8,69 @@ import { listPublishConfigNames, publishConfigsDir, WECHAT_CONFIG_PREFIX } from 
 import { isTTY } from '../shared/ui.ts';
 
 /**
- * 微信公众号发布配置:每个教程一个文件,与掘金侧同住 src/publish/configs/,
- * 文件名以 `wechat-` 开头(如 `wechat-vllm.ts`),靠前缀与掘金配置区分。
- * 理由见 publish-config.ts 里 WECHAT_CONFIG_PREFIX 的注释。
+ * WeChat publish config: one file per tutorial, living in src/publish/configs/ with a
+ * `wechat-` filename prefix to separate it from Juejin configs (see WECHAT_CONFIG_PREFIX).
  *
- * ⚠️ 与 publish-config.ts 一样,本模块必须**无副作用** —— 配置文件要
- * `import type { WechatConfig }` 从这里取类型,不能连带执行入口的 main()。
+ * Must stay **side-effect free** like publish-config.ts: config files `import type` from
+ * here and must not trigger the entry's main().
  */
 
-/** 单个教程的微信发布配置 */
+/** Publish config for a single tutorial */
 export interface WechatConfig {
-  /** 源目录名(相对仓库根),如 'vllm-toturial' */
+  /** Source dir name (relative to repo root), e.g. 'vllm-toturial' */
   sourceDir: string;
-  /** 文件名前缀,匹配 <前缀>-<编号>-<标题>.md */
+  /** Filename prefix, matching <prefix>-<number>-<title>.md */
   filePrefix: string;
-  /** 起始编号(公众号从第 08 章起) */
+  /** Starting number (WeChat starts at chapter 08) */
   fromNumber: number;
-  /** 标题取原文 H1 还是文件名;省略按 'h1' */
+  /** Title from the source H1 or the filename; defaults to 'h1' */
   titleSource?: TitleSource;
-  /** 只在 `titleSource: 'fileName'` 时生效:给标题补的系列名前缀(见 PublishConfig.titlePrefix) */
+  /** Only with `titleSource: 'fileName'`: series-name prefix added to the title (see PublishConfig.titlePrefix) */
   titlePrefix?: string;
 
-  /** 公众号 AppID(不是密码,可以明文) */
+  /** WeChat AppID (not a secret, so plaintext is fine) */
   appId: string;
   /**
-   * 存 AppSecret 的文件名(相对仓库根),默认 `.wechat-secret`。
-   * 环境变量 `WECHAT_APPSECRET` 优先级更高。
-   * ⚠️ 这个文件必须被 .gitignore 覆盖,写入前会强制校验(见 credential.ts)。
+   * File holding the AppSecret (relative to repo root), default `.wechat-secret`.
+   * `WECHAT_APPSECRET` env var takes precedence. Must be covered by .gitignore,
+   * enforced before writing (see credential.ts).
    */
   secretFile?: string;
 
-  /** 摘要 digest,key = 两位编号。上限 120 字,建议 60~90;留空则让公众号按正文前 54 字自动生成 */
+  /** Digest map, key = two-digit number. Max 120 chars, 60-90 recommended; empty lets WeChat auto-generate from the first 54 chars */
   digests: Record<string, string>;
-  /** 个别篇的标题覆盖 —— 微信标题上限 **32 字**,超了会被拒 */
+  /** Per-article title overrides — the WeChat title limit is **32 chars**, over is rejected */
   titleOverrides?: Record<string, string>;
-  /** 作者名(≤16 字);留空则不传该字段 */
+  /** Author name (<=16 chars); empty omits the field */
   author?: string;
   /**
-   * 封面图本地路径(如 'assets/cover.png')。留空则不传封面,
-   * 改为**从草稿箱里已有草稿借一个 `thumb_media_id`** ——
-   * 你手动排好第一篇并设好封面之后,脚本就能把那个封面复用到其余各期。
+   * Local cover image path (e.g. 'assets/cover.png'). Empty borrows a `thumb_media_id`
+   * from an existing draft, so a manually set cover is reused across issues.
    */
   coverImage?: string;
 
-  /** 排期起始日 `YYYY-MM-DD`,--plan 从这天开始逐日排 */
+  /** Schedule start date `YYYY-MM-DD`; --plan lays out day by day from here */
   startDate: string;
 
-  /**
-   * 拆篇时用的生效上限,默认 50 万(护栏,不是接口上限 —— 接口实测能收 18 万,
-   * 见 src/publish/markdown.ts)。正常一章一期,不会触发拆分。
-   */
+  /** Effective split limit, default 500k — a guardrail, not the API limit (see src/publish/markdown.ts) */
   contentLimit?: number;
-  /** 「阅读原文」链接;未认证订阅号不支持外链,默认留空 */
+  /** "Read original" link; unverified subscription accounts don't support external links, so empty by default */
   contentSourceUrl?: string;
 
-  /** 建草稿的间隔(毫秒) */
+  /** Delay between draft creations (ms) */
   delayMs: number;
-  /** 单次请求超时(毫秒) */
+  /** Per-request timeout (ms) */
   timeoutMs: number;
 }
 
-/** 默认的 AppSecret 文件名 */
+/** Default AppSecret filename */
 export const DEFAULT_SECRET_FILE = '.wechat-secret';
 
 export function wechatConfigFileName(name: string): string {
   return path.join(publishConfigsDir, `${name}.ts`);
 }
 
-/** 列出 src/publish/src/publish/configs/ 下已有的**微信**发布配置名(带 wechat- 前缀,返回值也带前缀) */
+/** List **WeChat** config names (returned with the `wechat-` prefix) */
 export function listWechatConfigNames(): string[] {
   if (!existsSync(publishConfigsDir)) return [];
   return readdirSync(publishConfigsDir)
@@ -86,38 +81,35 @@ export function listWechatConfigNames(): string[] {
 
 export async function loadWechatConfig(name: string): Promise<WechatConfig> {
   const mod = (await import(pathToFileURL(wechatConfigFileName(name)).href)) as { default?: WechatConfig };
-  if (!mod.default) throw new Error(`微信配置 ${name} 缺少 default 导出`);
+  if (!mod.default) throw new Error(`WeChat config ${name} is missing a default export`);
   return mod.default;
 }
 
-/**
- * 未指定配置名时:只有一个就直用,多个则交互选择(TTY),否则报错并列出。
- * 连**名字**一起返回 —— 状态文件的名字要用它,不能只拿到配置对象。
- */
+/** Pick a config: sole one is used directly, several prompt on a TTY, else error. Returns the name too, which the state file needs. */
 export async function pickWechatConfig(): Promise<{ name: string; config: WechatConfig }> {
   const names = listWechatConfigNames();
   if (names.length === 0) {
     throw new Error(
-      `src/publish/src/publish/configs/ 下没有微信配置(需要 ${WECHAT_CONFIG_PREFIX}*.ts)。\n` +
-        `  已有的掘金配置: ${listPublishConfigNames().join(', ') || '无'}`,
+      `No WeChat config under src/publish/src/publish/configs/ (need ${WECHAT_CONFIG_PREFIX}*.ts).\n` +
+        `  Existing Juejin configs: ${listPublishConfigNames().join(', ') || 'none'}`,
     );
   }
   if (names.length === 1) return { name: names[0], config: await loadWechatConfig(names[0]) };
 
   if (isTTY()) {
     const name = await select({
-      message: '选择要发布的微信公众号配置:',
+      message: 'Select the WeChat config to publish:',
       options: names.map((n) => ({ value: n, label: n })),
     });
     if (typeof name !== 'string' || !name) process.exit(130);
     return { name, config: await loadWechatConfig(name) };
   }
-  throw new Error(`src/publish/src/publish/configs/ 下有多个微信配置(${names.join(', ')}),请显式指定配置名`);
+  throw new Error(`Multiple WeChat configs under src/publish/src/publish/configs/ (${names.join(', ')}); specify a config name explicitly`);
 }
 
-// ============ 凭据 ============
+// ============ Credentials ============
 
-/** 只显示首尾各 4 位;长度不足时整体打码 */
+/** Show only the first/last 4 chars; mask entirely if too short */
 export function maskSecret(s: string): string {
   if (s.length <= 8) return '****';
   return `${s.slice(0, 4)}…${s.slice(-4)}`;
@@ -125,23 +117,21 @@ export function maskSecret(s: string): string {
 
 export interface SecretReadResult {
   secret: string;
-  /** 来源描述(用于打印,不含密钥本身) */
+  /** Source description (printed; never the secret itself) */
   source: string;
 }
 
 /**
- * 读 AppSecret:环境变量 `WECHAT_APPSECRET` 优先,其次配置文件。
- *
- * ⚠️ 与掘金的 sessionid 同级 —— 只打印掩码,永不回显明文,也不写进任何日志。
- * 读取前先确认该文件被 .gitignore 覆盖:**未通过就拒绝使用**,
- * 免得凭据已经躺在会被提交的位置上而我们还在用它发文章。
+ * Read the AppSecret: `WECHAT_APPSECRET` env var first, then the config file. Only the
+ * mask is ever printed. The file must be proven .gitignore'd first — if not, refuse to
+ * use it rather than publish with a credential sitting in a committable location.
  */
 export function readAppSecret(
   repoRoot: string,
   cfg: WechatConfig,
 ): SecretReadResult | { error: string } {
   const env = process.env.WECHAT_APPSECRET?.trim();
-  if (env) return { secret: env, source: '环境变量 WECHAT_APPSECRET' };
+  if (env) return { secret: env, source: 'WECHAT_APPSECRET env var' };
 
   const fileName = cfg.secretFile ?? DEFAULT_SECRET_FILE;
   const risk = assertCookieIgnored(repoRoot, fileName);
@@ -151,33 +141,33 @@ export function readAppSecret(
   if (!existsSync(file)) {
     return {
       error:
-        `读不到 AppSecret:环境变量 WECHAT_APPSECRET 为空,${file} 也不存在。\n` +
-        `  拿法:微信开发者平台(developers.weixin.qq.com/platform/)→ 我的业务 → 公众号\n` +
-        `       → 基础信息 → 开发密钥 → 重置。⚠️ 平台不保存 AppSecret,只显示一次,\n` +
-        `       忘了只能重置(重置会让旧的立刻失效)。\n` +
-        `  ⚠️ 不要贴到对话里 —— 贴了就会留在记录里。写进文件即可:\n` +
-        `     echo "你的AppSecret" > ${fileName}`,
+        `Cannot read AppSecret: WECHAT_APPSECRET env var is empty and ${file} does not exist.\n` +
+        `  How to get it: WeChat developer platform (developers.weixin.qq.com/platform/) → My business → Public account\n` +
+        `       → Basic info → Developer secret → Reset. ⚠️ The platform does not store AppSecret, it is shown only once,\n` +
+        `       so if you forget it you can only reset (resetting invalidates the old one immediately).\n` +
+        `  ⚠️ Do not paste it into a chat — it would stay in the record. Just write it to the file:\n` +
+        `     echo "yourAppSecret" > ${fileName}`,
     };
   }
   const secret = readFileSync(file, 'utf8').trim();
-  if (!secret) return { error: `${file} 是空的。` };
+  if (!secret) return { error: `${file} is empty.` };
   return { secret, source: `${fileName}(${maskSecret(secret)})` };
 }
 
-/** 校验配置里的必填项,返回问题列表(空数组=没问题)。不联网。 */
+/** Validate required fields, returning problems (empty array = fine). No network. */
 export function configProblems(cfg: WechatConfig): string[] {
   const out: string[] = [];
   if (!cfg.appId.trim()) {
-    out.push('appId 还没填(微信开发者平台 → 我的业务 → 公众号 → 基础信息)');
+    out.push('appId is not set (WeChat developer platform → My business → Public account → Basic info)');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cfg.startDate)) {
-    out.push(`startDate 应为 YYYY-MM-DD,当前是 "${cfg.startDate}"`);
+    out.push(`startDate must be YYYY-MM-DD, currently "${cfg.startDate}"`);
   }
   if (cfg.author && cfg.author.length > 16) {
-    out.push(`author ${cfg.author.length} 字,超过 16 字上限`);
+    out.push(`author is ${cfg.author.length} chars, over the 16-char limit`);
   }
   if (cfg.coverImage && !existsSync(path.resolve(process.cwd(), cfg.coverImage))) {
-    out.push(`coverImage 指向的文件不存在: ${cfg.coverImage}`);
+    out.push(`coverImage points to a missing file: ${cfg.coverImage}`);
   }
   return out;
 }

@@ -2,7 +2,7 @@ import { spinner } from '@clack/prompts';
 import pc from 'picocolors';
 import type { SpinnerHandle } from './types.ts';
 
-/** 是否在交互终端运行（stdin 与 stdout 都是 TTY） */
+/** Whether both stdin and stdout are TTYs */
 export function isTTY(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
 }
@@ -10,7 +10,7 @@ export function isTTY(): boolean {
 let timer: ReturnType<typeof setInterval> | null = null;
 let active: ReturnType<typeof spinner> | null = null;
 
-/** 启动 clack spinner,并周期性刷新「标签 · 已用秒数」 */
+/** Start the clack spinner and periodically refresh a "label · elapsed seconds" line */
 export function startSpinner(label: string): SpinnerHandle {
   const start = performance.now();
 
@@ -42,7 +42,7 @@ export function startSpinner(label: string): SpinnerHandle {
   }
 }
 
-/** SIGINT 时停掉可能还在跑的 spinner */
+/** Stop the spinner on SIGINT */
 export function stopSpinnerActive(): void {
   if (timer) {
     clearInterval(timer);
@@ -54,43 +54,31 @@ export function stopSpinnerActive(): void {
   }
 }
 
-/** 流式输出期间的耗时指示器 */
+/** Elapsed-time indicator shown while streaming */
 export interface StreamClock {
-  /**
-   * 把一段流式输出交给它写。**必须走这里,不要自己再 write 一遍** ——
-   * 顺序是「先擦进度行 → 写正文 → 正文以换行结尾的话补一行进度」,
-   * 拆开做就会把进度文字拼进正文行里。
-   */
+  /** Write a streaming chunk. **Use this, don't write directly** — it keeps erase/write/top-up ordered. */
   write(chunk: string, to?: 'stdout' | 'stderr'): void;
-  /** 流式结束,擦掉进度行 */
+  /** Streaming finished, erase the progress line */
   stop(): void;
 }
 
-/** 当前活着的计时器(SIGINT 时要能擦掉它画的那半行) */
+/** The live clock (SIGINT must erase the half line it drew) */
 let activeClock: StreamClock | null = null;
 
-/** SIGINT 时停掉可能还在跑的计时器 */
+/** Stop the stream clock on SIGINT */
 export function stopStreamClockActive(): void {
   activeClock?.stop();
   activeClock = null;
 }
 
 /**
- * 流式输出期间的「已用 Xs」计时器。
+ * The "elapsed Xs" clock shown while streaming.
  *
- * ⚠️ 为什么不能继续用 spinner:spinner 独占一行、靠不断重画那一行来刷时间,
- * 而流式正文是连续写出去的 —— 两者会互相覆盖,所以 run.ts 一收到输出就把
- * spinner 拆了。但拆了之后整轮就**再没有任何时间参考**,一轮跑十几分钟时很难受。
- *
- * 这个计时器的做法:进度只在**光标停在空行行首**时画(也就是刚写完一段以
- * 换行结尾的正文之后),它独占那一行;下一段正文到达前先 `\r\x1b[K` 擦掉。
- * 所以它永远不会擦到正文,也不会把进度文字拼进正文行里。
- *
- * 因此它必须**自己写正文**(见 StreamClock.write 的注释)—— 擦、写、补
- * 这个顺序不能拆到调用方去做。
- *
- * 非 TTY(stdout 被重定向到文件)时不能这么干 —— 那些 \r 会变成日志里的乱码,
- * 所以那种情况下改成每 30 秒打一行普通文本。picocolors 非 TTY 自动无色。
+ * The spinner and the streaming body would overwrite each other, so run.ts tears the spinner down as
+ * soon as output starts — but then the round has no time reference. This clock paints only at the start
+ * of an empty line and erases before the next body chunk, so it never touches the body; it must write
+ * the body itself (see StreamClock.write). In non-TTY it prints a plain line every 30s instead, since
+ * \r would garble the log.
  */
 export function startStreamClock(label: string): StreamClock {
   const start = performance.now();
@@ -98,7 +86,7 @@ export function startStreamClock(label: string): StreamClock {
 
   if (!tty) {
     const timer = setInterval(() => {
-      console.log(`${label} · 已用 ${Math.floor((performance.now() - start) / 1000)}s`);
+      console.log(`${label} · elapsed ${Math.floor((performance.now() - start) / 1000)}s`);
     }, 30_000);
     const plain: StreamClock = {
       write(chunk: string, to: 'stdout' | 'stderr' = 'stdout'): void {
@@ -113,9 +101,9 @@ export function startStreamClock(label: string): StreamClock {
     return plain;
   }
 
-  /** 光标停在空行行首(可以安全新画一行进度) */
+  /** Cursor is at the start of an empty line (safe to paint a new progress line) */
   let atLineStart = true;
-  /** 进度当前正独占着光标所在的那一行 */
+  /** Progress currently owns the cursor's line */
   let painted = false;
   let lastPaint = 0;
 
@@ -127,15 +115,10 @@ export function startStreamClock(label: string): StreamClock {
   };
 
   /**
-   * 画/刷新进度。两条合法的前提(调用方保证):
-   *   - painted 为真 —— 那一行只有我们,原地重画;
-   *   - atLineStart 为真 —— 光标在空行行首,这是新的一行。
-   * 其余情况一律不画:行中间那半行是正文,`\r\x1b[K` 一擦就是真丢显示。
-   *
-   * ⚠️ 别改成「只在 setInterval 里刷」:流式分片几十毫秒来一片,行首的窗口很短,
-   * 1 秒一次的 tick 撞进行首的概率很低,可能十几秒才刷上一次,甚至一直撞不上。
-   * 所以主要靠 write() 在「这段正文以换行结尾」时立刻补画 —— 那一刻光标正好在行首。
-   * lastPaint 那个间隔是防抖:markdown 流里换行很密,不拦一下每片都会重画一次。
+   * Paint only when the caller guarantees painted (redraw our own line) or atLineStart (new empty
+   * line); otherwise erasing mid-line progress would really lose display. Do not move refresh into
+   * setInterval — the start-of-line window is too short to hit; write() repaints on newline-ending
+   * chunks, and lastPaint debounces dense markdown newlines.
    */
   const paint = (): void => {
     if (!painted && !atLineStart) return;
@@ -143,11 +126,11 @@ export function startStreamClock(label: string): StreamClock {
     if (now - lastPaint < 900) return;
     lastPaint = now;
     const secs = Math.floor((now - start) / 1000);
-    process.stdout.write(`\r${pc.dim(`${label} · 已用 ${secs}s`)}\x1b[K`);
+    process.stdout.write(`\r${pc.dim(`${label} · elapsed ${secs}s`)}\x1b[K`);
     painted = true;
   };
 
-  // 兜底:流**停住**了(在等模型、没有输出)也要能看出还在跑
+  // Fallback: also repaint while the stream stalls (waiting on the model)
   const timer = setInterval(paint, 1000);
 
   const clock: StreamClock = {
@@ -167,14 +150,14 @@ export function startStreamClock(label: string): StreamClock {
   return clock;
 }
 
-// ============ 日志（无 spinner 时使用;picocolors 非 TTY 自动无色） ============
+// ============ Logging (no spinner; picocolors disables color in non-TTY) ============
 
 export function header(title: string): void {
   console.log(pc.bold(pc.cyan(`━━━ ${title} ━━━`)));
 }
 
 export function roundHeader(i: number, max: number): void {
-  console.log(pc.bold(pc.cyan(`━━━ 第 ${i}/${max} 轮 ━━━`)));
+  console.log(pc.bold(pc.cyan(`━━━ Round ${i}/${max} ━━━`)));
 }
 
 export function success(msg: string): void {

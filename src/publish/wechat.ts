@@ -26,33 +26,30 @@ import {
 import { buildIssues, type Issue } from './wechat-issues.ts';
 
 /**
- * 把教程章节发到微信公众号。
+ * Publish tutorial chapters to a WeChat Official Account.
  *
- * ⚠️ **个人订阅号没有群发/发布接口**(调用返回 48001),所以脚本能做的
- * 最后一件事是「建草稿」。真正发表那一步必须在公众号后台点 —— 好消息是
- * 后台自带「定时发表」,排好之后它自己会发。本脚本负责的是:
+ * ⚠️ Personal subscription accounts have no publish API(returns 48001), so this
+ * stops at creating drafts; the final publish must be done in the backend(or via
+ * its "scheduled publishing"). It does: Markdown→HTML(with a 20k-char limit check
+ * and auto-splitting), a zero-key local preview page, draft creation via the API
+ * (needs AppID/AppSecret), and a schedule table.
  *
- *   1. 把 Markdown 转成公众号能用的 HTML(带 2 万字符上限的校验与自动拆篇)
- *   2. 生成一个**本地预览页**,可以逐期「复制正文」粘进编辑器(零密钥)
- *   3. 用草稿箱接口**把各期直接建成草稿**并记账(需要 AppID/AppSecret)
- *   4. 打印一张**排期表**,你按它在后台设定时发表
- *
- * 用法:
- *   node src/publish/publish.ts wechat --list            # 期次清单 + 长度/标题/摘要预检(不联网)
- *   node src/publish/publish.ts wechat --build           # 生成预览页与 HTML 片段(不联网)
- *   node src/publish/publish.ts wechat --plan            # 排期表(不联网)
- *   node src/publish/publish.ts wechat --ip              # 查本机公网出口 IP(配白名单用)
- *   node src/publish/publish.ts wechat --check           # 对账草稿箱(只读,需要密钥)
- *   node src/publish/publish.ts wechat --drafts          # 建草稿:建完第 1 期会停下让你看排版
- *   node src/publish/publish.ts wechat --drafts --yes    # 不再停顿,一次建完
+ * Usage:
+ *   node src/publish/publish.ts wechat --list            # issue list + length/title/digest precheck(offline)
+ *   node src/publish/publish.ts wechat --build           # generate the preview page and HTML fragments(offline)
+ *   node src/publish/publish.ts wechat --plan            # schedule table(offline)
+ *   node src/publish/publish.ts wechat --ip              # look up this machine's public egress IP(for whitelisting)
+ *   node src/publish/publish.ts wechat --check           # reconcile the draft box(read-only, requires keys)
+ *   node src/publish/publish.ts wechat --drafts          # create drafts: after issue 1 it stops so you can check the layout
+ *   node src/publish/publish.ts wechat --drafts --yes    # no more stops, create them all in one go
  *   node src/publish/publish.ts wechat --drafts --only 08 --force
  *
- * 退出码:0 完成、1 出错、2 在确认点暂停(状态已落盘,可续跑)、130 中断。
+ * Exit codes: 0 done, 1 error, 2 paused at a confirmation point(state already saved to disk, resumable), 130 interrupted.
  */
 
 const REPO_ROOT = process.cwd();
 
-/** 产物目录(已被 .gitignore 覆盖) */
+/** Output directory(already covered by .gitignore) */
 const OUT_DIR = path.join(REPO_ROOT, '.wechat-out');
 
 interface CliOptions {
@@ -87,7 +84,7 @@ function defaultOptions(): CliOptions {
   };
 }
 
-/** 手写参数解析(与 publish.ts 一致,不引入解析库) */
+/** Hand-written argument parsing(consistent with publish.ts, no parsing library) */
 function parseArgs(argv: string[]): CliOptions | { error: string } {
   const o = defaultOptions();
   for (let i = 0; i < argv.length; i++) {
@@ -108,20 +105,20 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
       case '--debug': o.debug = true; break;
       case '--only': {
         const v = needValue();
-        if (v === null) return { error: '--only 需要一个期号,如 --only 08 或 --only 18-2' };
+        if (v === null) return { error: '--only needs an issue number, e.g. --only 08 or --only 18-2' };
         o.only = v;
         break;
       }
       case '--delay': {
         const v = needValue();
         const n = Number(v);
-        if (v === null || !Number.isFinite(n) || n < 0) return { error: '--delay 需要毫秒数,如 --delay 5000' };
+        if (v === null || !Number.isFinite(n) || n < 0) return { error: '--delay needs a number of milliseconds, e.g. --delay 5000' };
         o.delayMs = n;
         break;
       }
       default: {
-        if (arg.startsWith('--')) return { error: `未知参数: ${arg}` };
-        if (o.configName) return { error: `只能指定一个配置名,多给了: ${arg}` };
+        if (arg.startsWith('--')) return { error: `Unknown argument: ${arg}` };
+        if (o.configName) return { error: `Only one config name may be given, extra: ${arg}` };
         o.configName = arg;
       }
     }
@@ -129,7 +126,7 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
   return o;
 }
 
-/** `--only 8` / `--only 08` / `--only 18-2` 都接受 */
+/** `--only 8` / `--only 08` / `--only 18-2` are all accepted */
 function normalizeIssueId(v: string): string {
   const m = /^(\d+)(?:-(\d+))?$/.exec(v.trim());
   if (!m) return v.trim();
@@ -141,9 +138,9 @@ function buildHooks(opts: CliOptions): wechat.WechatHooks {
   return { onDebug: (msg: string) => dim(`  · ${msg}`) };
 }
 
-// ============ 日期 ============
+// ============ Dates ============
 
-/** 'YYYY-MM-DD' 加天数(按 UTC 算,避免时区把日期挪一天) */
+/** 'YYYY-MM-DD' plus a number of days(computed in UTC, so the time zone can't shift the date by a day) */
 function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number);
   const t = new Date(Date.UTC(y, m - 1, d) + days * 86_400_000);
@@ -152,15 +149,15 @@ function addDays(iso: string, days: number): string {
 
 function weekday(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return `周${'日一二三四五六'[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
+  return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
 }
 
-/** 第 n 期(1 起)的发布日期 */
+/** Publish date of issue n(1-based) */
 function issueDate(startDate: string, order: number): string {
   return addDays(startDate, order - 1);
 }
 
-// ============ 期次装载 ============
+// ============ Issue loading ============
 
 interface Loaded {
   cfgName: string;
@@ -168,7 +165,7 @@ interface Loaded {
   issues: Issue[];
 }
 
-/** 载入配置 + 扫描文章 + 编排期次(长度/标题/摘要的问题都在这一步暴露) */
+/** Load the config + scan the articles + assemble the issues(length/title/digest problems all surface at this step) */
 async function loadIssues(opts: CliOptions): Promise<Loaded | { error: string }> {
   let cfgName: string;
   let cfg: WechatConfig;
@@ -177,7 +174,7 @@ async function loadIssues(opts: CliOptions): Promise<Loaded | { error: string }>
       cfgName = opts.configName;
       if (!listWechatConfigNames().includes(cfgName)) {
         return {
-          error: `src/publish/src/publish/configs/ 下没有微信配置: ${cfgName}(可用: ${listWechatConfigNames().join(', ') || '无'})`,
+          error: `No WeChat config under src/publish/src/publish/configs/: ${cfgName}(available: ${listWechatConfigNames().join(', ') || 'none'})`,
         };
       }
       cfg = await loadWechatConfig(cfgName);
@@ -214,7 +211,7 @@ function selectIssues(issues: Issue[], opts: CliOptions): Issue[] | { error: str
   const id = normalizeIssueId(opts.only);
   const found = issues.filter((i) => i.id === id || i.no === id);
   if (found.length === 0) {
-    return { error: `没有匹配的期次: ${opts.only}(可用: ${issues.map((i) => i.id).join(', ')})` };
+    return { error: `No matching issue: ${opts.only}(available: ${issues.map((i) => i.id).join(', ')})` };
   }
   return found;
 }
@@ -222,12 +219,12 @@ function selectIssues(issues: Issue[], opts: CliOptions): Issue[] | { error: str
 // ============ --list ============
 
 function runList(cfg: WechatConfig, issues: Issue[]): number {
-  header('微信公众号期次清单');
+  header('WeChat Official Account issue list');
   const limit = issues[0]?.limit ?? WECHAT_CONTENT_LIMIT;
   info(
-    `  共 ${issues.length} 期 · 正文上限 ${limit} 字符` +
-      `${limit < WECHAT_CONTENT_LIMIT ? `(接口上限 ${WECHAT_CONTENT_LIMIT},配置里留了余量)` : ''}` +
-      ` · 起始日 ${cfg.startDate}`,
+    `  ${issues.length} issues · body limit ${limit} chars` +
+      `${limit < WECHAT_CONTENT_LIMIT ? `(API limit ${WECHAT_CONTENT_LIMIT}, the config leaves some headroom)` : ''}` +
+      ` · start date ${cfg.startDate}`,
   );
   info('');
 
@@ -236,11 +233,11 @@ function runList(cfg: WechatConfig, issues: Issue[]): number {
     const len = issue.content.length;
     const ratio = (len / issue.limit) * 100;
     const mark =
-      len > issue.limit ? pc.red('超限') : ratio >= 98 ? pc.yellow('卡线') : pc.green('ok  ');
-    const digest = issue.digest ? `${issue.digest.length}字` : pc.yellow('无');
+      len > issue.limit ? pc.red('OVER') : ratio >= 98 ? pc.yellow('TIGHT') : pc.green('ok  ');
+    const digest = issue.digest ? `${issue.digest.length} chars` : pc.yellow('none');
     info(
       `  ${String(issue.order).padStart(2)}  ${issue.id.padEnd(6)} ${mark} ${String(len).padStart(5)}(${String(Math.round(ratio)).padStart(3)}%)` +
-        ` 标题${String(issue.title.length).padStart(2)}字 摘要${digest}  ${issue.title}`,
+        ` title ${String(issue.title.length).padStart(2)} chars digest ${digest}  ${issue.title}`,
     );
     for (const w of issue.warnings) {
       warned++;
@@ -253,27 +250,27 @@ function runList(cfg: WechatConfig, issues: Issue[]): number {
   for (const i of split) byArticle.set(i.no, i.parts);
   const tight = issues.filter((i) => i.content.length / i.limit >= 0.98);
   info('');
-  info(`  拆开的篇: ${[...byArticle].map(([no, p]) => `${no}→${p}期`).join(' ') || '无'}`);
-  info(`  最长一期 ${Math.max(...issues.map((i) => i.content.length))} 字符`);
+  info(`  Split articles: ${[...byArticle].map(([no, p]) => `${no}→${p} issues`).join(' ') || 'none'}`);
+  info(`  Longest single issue ${Math.max(...issues.map((i) => i.content.length))} chars`);
   if (tight.length > 0) {
     dim(
-      `  贴在上限上(≥98%): ${tight.map((i) => `第${i.order}期 ${i.content.length}`).join(' · ')} ——` +
-        ` 2 万是接口文档的硬上限,这几期是按「刚够」算的。若接口拒收,` +
-        `把配置里的 contentLimit 设成 19000(留 5% 余量),它们会各自再拆一期。`,
+      `  Hugging the limit(≥98%): ${tight.map((i) => `issue ${i.order} ${i.content.length}`).join(' · ')} —` +
+        ` 20,000 is the hard limit in the API docs, and these issues are sized to "just barely fit". If the API rejects them,` +
+        ` set contentLimit in the config to 19000(leaving 5% headroom) and each of them will be split into one more part.`,
     );
   }
-  if (warned > 0) dim(`  以上 ${warned} 条提醒不阻塞发布(--build/--drafts 都会照做)`);
+  if (warned > 0) dim(`  The above ${warned} warnings do not block publishing(--build/--drafts will proceed anyway)`);
   return 0;
 }
 
 // ============ --plan ============
 
 function runPlan(cfg: WechatConfig, issues: Issue[]): number {
-  header('排期表');
-  info(`  起始日 ${cfg.startDate}(${weekday(cfg.startDate)}) · 共 ${issues.length} 期 · 每天 1 期`);
+  header('Schedule table');
+  info(`  Start date ${cfg.startDate}(${weekday(cfg.startDate)}) · ${issues.length} issues · 1 issue per day`);
   info(
-    `  公众号后台的「定时发表」**最多只能提前 7 天**,所以分 ${Math.ceil(issues.length / 7)} 轮排完;` +
-      `每轮的操作日就是那批里第 1 期的日期。`,
+    `  The Official Account backend's "scheduled publishing" **can only be set at most 7 days in advance**, so it takes ${Math.ceil(issues.length / 7)} rounds to schedule them all;` +
+      ` the operating day for each round is the date of that batch's 1st issue.`,
   );
   info('');
 
@@ -283,27 +280,27 @@ function runPlan(cfg: WechatConfig, issues: Issue[]): number {
     const first = issueDate(cfg.startDate, batch[0].order);
     const last = issueDate(cfg.startDate, batch[batch.length - 1].order);
     info(
-      pc.bold(`  第 ${r + 1} 轮`) +
-        `  ${first}(${weekday(first)}) 起 ${batch.length} 期 → ${last}(${weekday(last)})  · 操作日 ${first}`,
+      pc.bold(`  Round ${r + 1}`) +
+        `  ${first}(${weekday(first)}) starts ${batch.length} issues → ${last}(${weekday(last)})  · operating day ${first}`,
     );
     for (const issue of batch) {
       const d = issueDate(cfg.startDate, issue.order);
-      info(`      ${d}(${weekday(d)})  第 ${String(issue.order).padStart(2)} 期  ${issue.title}`);
+      info(`      ${d}(${weekday(d)})  issue ${String(issue.order).padStart(2)}  ${issue.title}`);
     }
     info('');
   }
 
   const lastDate = issueDate(cfg.startDate, issues.length);
-  info(`  最后一期落在 ${lastDate}(${weekday(lastDate)})。`);
+  info(`  The last issue lands on ${lastDate}(${weekday(lastDate)}).`);
   info(
-    `  若今天已经发过一篇、排不下 ${cfg.startDate},把配置里的 startDate 改成 ${addDays(cfg.startDate, 1)} 即可。`,
+    `  If you have already published one today and ${cfg.startDate} doesn't fit, just change startDate in the config to ${addDays(cfg.startDate, 1)}.`,
   );
   return 0;
 }
 
 // ============ --build ============
 
-/** 预览页:一页列全部期次,逐期「复制正文」直接粘进公众号编辑器 */
+/** Preview page: lists all issues on one page, "copy body" issue by issue to paste straight into the Official Account editor */
 function renderPreview(cfg: WechatConfig, cfgName: string, issues: Issue[]): string {
   const cards = issues
     .map((issue) => {
@@ -314,21 +311,21 @@ function renderPreview(cfg: WechatConfig, cfgName: string, issues: Issue[]): str
 <section class="card">
   <div class="head">
     <div>
-      <div class="eyebrow">第 ${issue.order} 期 · ${d}(${weekday(d)}) ${splitNote}</div>
+      <div class="eyebrow">Issue ${issue.order} · ${d}(${weekday(d)}) ${splitNote}</div>
       <h2 class="title">${escapeHtml(issue.title)}</h2>
-      <div class="meta">正文 ${issue.content.length} 字符 / 上限 ${issue.limit} · 标题 ${issue.title.length} 字 / 上限 32 · 摘要 ${
-        issue.digest ? `${issue.digest.length} 字` : '无(由公众号自动生成)'
+      <div class="meta">body ${issue.content.length} chars / limit ${issue.limit} · title ${issue.title.length} chars / limit 32 · digest ${
+        issue.digest ? `${issue.digest.length} chars` : 'none(auto-generated by the Official Account)'
       }</div>
     </div>
     <div class="actions">
-      <button onclick="copyTitle(this, ${JSON.stringify(issue.title).replace(/"/g, '&quot;')})">复制标题</button>
-      <button class="primary" onclick="copyBody(this, 'c-${issue.id}')">复制正文</button>
+      <button onclick="copyTitle(this, ${JSON.stringify(issue.title).replace(/"/g, '&quot;')})">Copy title</button>
+      <button class="primary" onclick="copyBody(this, 'c-${issue.id}')">Copy body</button>
     </div>
   </div>
   ${warns}
   <details>
-    <summary>看摘要</summary>
-    <div class="digest">${escapeHtml(issue.digest || '(空)')}</div>
+    <summary>Show digest</summary>
+    <div class="digest">${escapeHtml(issue.digest || '(empty)')}</div>
   </details>
   <div class="phone">
     <div class="content" id="c-${issue.id}">${issue.content}</div>
@@ -341,7 +338,7 @@ function renderPreview(cfg: WechatConfig, cfgName: string, issues: Issue[]): str
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>${escapeHtml(cfgName)} · 微信公众号预览(${issues.length} 期)</title>
+<title>${escapeHtml(cfgName)} · WeChat Official Account preview(${issues.length} issues)</title>
 <style>
   body { margin:0; background:#f2f3f5; font:14px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1f2329; }
   .page { max-width:860px; margin:0 auto; padding:24px 16px 80px; }
@@ -375,17 +372,17 @@ function renderPreview(cfg: WechatConfig, cfgName: string, issues: Issue[]): str
 <body>
 <div class="page">
   <div class="top">
-    <h1>${escapeHtml(cfgName)} · 微信公众号预览</h1>
-    <p>共 <b>${issues.length}</b> 期,每期一天,起始日 ${cfg.startDate}(${weekday(cfg.startDate)})。</p>
-    <p><b>用法</b>:点「复制正文」→ 到公众号后台「草稿箱 → 新的创作 → 写新图文」,在正文区 <b>Ctrl+V</b> 粘贴(排版会一起带过去),再把标题粘上、设好封面。</p>
-    <p style="color:#c45656">未认证个人订阅号:正文里<b>不能带外部超链接</b>(外链会被剔除),现已把链接渲染成「文字 (地址)」纯文本;发表只能手动点或设「定时发表」。</p>
+    <h1>${escapeHtml(cfgName)} · WeChat Official Account preview</h1>
+    <p>${issues.length} issues total, one per day, starting ${cfg.startDate}(${weekday(cfg.startDate)}).</p>
+    <p><b>Usage</b>: click "Copy body" → in the Official Account backend go to "Drafts → New creation → Write a new article", then in the body area press <b>Ctrl+V</b> to paste(the formatting comes along), then paste the title and set the cover.</p>
+    <p style="color:#c45656">Unverified personal subscription account: the body <b>cannot contain external hyperlinks</b>(external links get stripped), so links are currently rendered as plain "text (address)"; publishing can only be done by hand or via "scheduled publishing".</p>
   </div>
   ${cards}
 </div>
 <script>
 function flash(btn, ok, okText) {
   var old = btn.textContent;
-  btn.textContent = ok ? okText : '复制失败,请手动选中';
+  btn.textContent = ok ? okText : 'Copy failed, please select manually';
   setTimeout(function () { btn.textContent = old; }, 1800);
 }
 function copyBody(btn, id) {
@@ -399,7 +396,7 @@ function copyBody(btn, id) {
   var ok = false;
   try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
   sel.removeAllRanges();
-  flash(btn, ok, '✔ 已复制');
+  flash(btn, ok, '✔ Copied');
 }
 function copyTitle(btn, text) {
   var ta = document.createElement('textarea');
@@ -411,7 +408,7 @@ function copyTitle(btn, text) {
   var ok = false;
   try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
   document.body.removeChild(ta);
-  flash(btn, ok, '✔ 已复制');
+  flash(btn, ok, '✔ Copied');
 }
 </script>
 </body>
@@ -430,28 +427,26 @@ function runBuild(cfg: WechatConfig, cfgName: string, issues: Issue[]): number {
   const preview = path.join(outDir, 'preview.html');
   writeFileSync(preview, renderPreview(cfg, cfgName, issues), 'utf8');
 
-  header('已生成预览页');
-  success(`  预览页: ${path.relative(REPO_ROOT, preview).replace(/\\/g, '/')}`);
-  info(`  另存了 ${issues.length} 份 HTML 片段(就是接口用的 content)与对应 Markdown`);
+  header('Preview page generated');
+  success(`  Preview page: ${path.relative(REPO_ROOT, preview).replace(/\\/g, '/')}`);
+  info(`  Also saved ${issues.length} HTML fragments(the content used by the API) and the corresponding Markdown`);
   info('');
-  info(`  用浏览器打开预览页 → 逐期「复制正文」→ 粘进公众号编辑器`);
-  info(`  (目录: ${path.relative(REPO_ROOT, outDir).replace(/\\/g, '/')}/)`);
+  info(`  Open the preview page in a browser → "copy body" issue by issue → paste into the Official Account editor`);
+  info(`  (directory: ${path.relative(REPO_ROOT, outDir).replace(/\\/g, '/')}/)`);
   return 0;
 }
 
-// ============ 状态 ============
+// ============ State ============
 
 /**
- * 微信侧的状态文件与掘金侧**共用 publish-state.ts 的读写与锁**
- * (原子写、损坏硬停、pid 锁那三条不变量一样都不想丢),只是换了 namespace。
+ * The WeChat state file **shares publish-state.ts's read/write and lock** with the
+ * Juejin side(atomic writes, hard stop on corruption, pid lock), just under a
+ * different namespace.
  *
- * 字段的对应关系:
- * - `status: 'pending' | 'drafted' | 'published'` = 未建草稿 / 草稿已建 / 已发表
- *   (个人订阅号没有发布接口,所以 `published` 是 `--check` 发现「草稿已不在草稿箱」时推断出来的)
- * - `draftId` = 草稿的 media_id
- * - `coverImage` = **这个系列共用的封面 thumb_media_id**
- *   (字段名在掘金那边是封面 URL;两边都是「全系列复用的封面引用」,含义一致)
- * - `articleId`/`url`/`publishAttemptedAt` 在个人订阅号上用不到,保持 null
+ * Field mapping: `status` = pending/drafted/published(with `published` inferred by
+ * `--check` when the draft is gone); `draftId` = the draft's media_id; `coverImage` =
+ * the series-wide cover thumb_media_id(holds the cover URL on the Juejin side);
+ * `articleId`/`url`/`publishAttemptedAt` are unused on personal accounts, kept null.
  */
 function statePath(cfgName: string): string {
   return stateFileName(REPO_ROOT, cfgName, 'wechat-publish-state');
@@ -470,15 +465,15 @@ interface Ready {
   stateFile: string;
 }
 
-/** 需要密钥的子命令走这里:校验配置 → 读密钥 → 读状态 → 取锁 */
+/** Subcommands that need keys go through here: validate config → read the secret → read state → take the lock */
 function prepareOnline(loaded: Loaded, opts: CliOptions): Ready | { error: string } {
   const problems = configProblems(loaded.cfg);
   if (problems.length > 0) {
-    return { error: `微信配置有问题:\n  - ${problems.join('\n  - ')}` };
+    return { error: `The WeChat config has problems:\n  - ${problems.join('\n  - ')}` };
   }
   const secretRes = readAppSecret(REPO_ROOT, loaded.cfg);
   if ('error' in secretRes) return { error: secretRes.error };
-  dim(`  凭据: appId ${loaded.cfg.appId} · AppSecret ${secretRes.source}`);
+  dim(`  Credentials: appId ${loaded.cfg.appId} · AppSecret ${secretRes.source}`);
 
   const stateFile = statePath(loaded.cfgName);
   const loadedState = loadState(stateFile);
@@ -503,16 +498,13 @@ function saveStateOrReport(stateFile: string, state: PublishState): boolean {
   return true;
 }
 
-// ============ 封面 ============
+// ============ Cover ============
 
 /**
- * 取封面。
- *
- * 顺序:状态里记着的 → 配置里的本地图片(上传成永久素材)→ **从草稿箱里借**。
- *
- * 「从草稿箱借」是这套流程的关键一步:公众号的草稿封面是必填项,而
- * 你在后台手动排第 1 期时一定会给它设一个封面 —— 那个 `thumb_media_id`
- * 就能给其余各期复用,于是**不需要准备任何本地图片**。
+ * Resolve the cover: state → local image in config(uploaded as a permanent asset)→
+ * **borrowed from the draft box**. Borrowing matters because a draft requires a cover,
+ * and the `thumb_media_id` you set on issue 1 in the backend can be reused across the
+ * rest — so no local image is needed.
  */
 async function resolveCover(
   ready: Ready,
@@ -521,48 +513,48 @@ async function resolveCover(
 ): Promise<{ mediaId: string } | { error: string }> {
   const { cfg, state, options } = ready;
   if (state.coverImage) {
-    dim(`  封面: 复用已记录的 thumb_media_id ${state.coverImage}`);
+    dim(`  Cover: reusing the recorded thumb_media_id ${state.coverImage}`);
     return { mediaId: state.coverImage };
   }
 
   if (cfg.coverImage) {
     const abs = path.resolve(REPO_ROOT, cfg.coverImage);
-    dim(`  封面: 上传本地图片 ${cfg.coverImage}`);
+    dim(`  Cover: uploading local image ${cfg.coverImage}`);
     const up = await wechat.uploadThumb(abs, options, hooks);
     if (!up.ok) {
-      error(`上传封面失败: ${up.errMsg}`);
+      error(`Failed to upload cover: ${up.errMsg}`);
       error(wechat.errorHint(up.kind, up.errMsg));
-      return { error: '上传封面失败' };
+      return { error: 'Failed to upload cover' };
     }
     state.coverImage = up.data;
-    if (!saveStateOrReport(ready.stateFile, state)) return { error: '状态写入失败' };
-    success(`  ✔ 封面已上传 thumb_media_id=${up.data}`);
+    if (!saveStateOrReport(ready.stateFile, state)) return { error: 'Failed to write state' };
+    success(`  ✔ Cover uploaded thumb_media_id=${up.data}`);
     return { mediaId: up.data };
   }
 
   if (opts.check) {
-    // --check 是只读命令,允许「还没封面」这种状态
+    // --check is a read-only command, so the "no cover yet" state is allowed
     return { mediaId: '' };
   }
 
-  dim('  封面: 配置里没有 coverImage,去草稿箱里找一个现成的封面……');
+  dim('  Cover: no coverImage in the config, looking in the draft box for an existing cover……');
   const drafts = await wechat.listDrafts(options, hooks);
   if (!drafts.ok) {
-    error(`读草稿箱失败: ${drafts.errMsg}`);
+    error(`Failed to read the draft box: ${drafts.errMsg}`);
     error(wechat.errorHint(drafts.kind, drafts.errMsg));
-    return { error: '读草稿箱失败' };
+    return { error: 'Failed to read the draft box' };
   }
   const found = drafts.data.find((d) => d.thumbMediaId);
   if (found) {
     state.coverImage = found.thumbMediaId;
-    if (!saveStateOrReport(ready.stateFile, state)) return { error: '状态写入失败' };
-    success(`  ✔ 从草稿「${found.title}」借到封面 thumb_media_id=${found.thumbMediaId}`);
+    if (!saveStateOrReport(ready.stateFile, state)) return { error: 'Failed to write state' };
+    success(`  ✔ Borrowed the cover thumb_media_id=${found.thumbMediaId} from draft "${found.title}"`);
     return { mediaId: found.thumbMediaId };
   }
 
   info('');
-  info('  ! 还没有封面:先建 1 期草稿,去后台给它设个封面,再重跑本命令 ——');
-  info('    之后各期会自动复用那个封面(也可以直接在本配置里填 coverImage 指向一张本地图片)。');
+  info('  ! No cover yet: create 1 draft issue first, set a cover for it in the backend, then rerun this command —');
+  info('    After that the other issues will automatically reuse that cover(you can also just fill in coverImage in this config to point at a local image).');
   return { mediaId: '' };
 }
 
@@ -572,19 +564,19 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
   const hooks = buildHooks(opts);
   const { cfg, issues, options, state } = ready;
 
-  header('对账草稿箱');
-  info(`  appId ${cfg.appId} · 本地记着 ${issues.length} 期`);
+  header('Reconcile the draft box');
+  info(`  appId ${cfg.appId} · ${issues.length} issues recorded locally`);
   info('');
 
-  const sp = startSpinner('拉取草稿箱');
+  const sp = startSpinner('Fetching the draft box');
   const drafts = await wechat.listDrafts(options, hooks);
   if (!drafts.ok) {
-    sp.stopError('拉取草稿箱失败');
+    sp.stopError('Failed to fetch the draft box');
     error(drafts.errMsg);
     error(wechat.errorHint(drafts.kind, drafts.errMsg));
     return 1;
   }
-  sp.stopSuccess(`草稿箱里现有 ${drafts.data.length} 条草稿`);
+  sp.stopSuccess(`The draft box currently has ${drafts.data.length} drafts`);
   info('');
 
   const byTitle = new Map<string, wechat.DraftBrief[]>();
@@ -607,7 +599,7 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
 
     if (matches.length > 1) {
       dup++;
-      dim(`  ! 第 ${issue.order} 期「${issue.title}」在草稿箱里有 ${matches.length} 条(重复草稿),media_id: ${matches.map((m) => m.mediaId).join(', ')}`);
+      dim(`  ! Issue ${issue.order} "${issue.title}" has ${matches.length} entries in the draft box(duplicate drafts), media_id: ${matches.map((m) => m.mediaId).join(', ')}`);
     }
 
     if (st.draftId) {
@@ -615,25 +607,25 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
         onDraft++;
         if (st.title && st.title !== issue.title) {
           changed++;
-          dim(`  ! 第 ${issue.order} 期草稿标题是「${st.title}」,与当前「${issue.title}」不一致`);
+          dim(`  ! Issue ${issue.order}'s draft title is "${st.title}", which does not match the current "${issue.title}"`);
         }
       } else if (matches.length > 0) {
         recovered++;
         st.draftId = matches[0].mediaId;
         st.status = 'drafted';
-        dim(`  ! 第 ${issue.order} 期本地记的 media_id 已不在草稿箱,改用同名的 ${matches[0].mediaId}`);
+        dim(`  ! Issue ${issue.order}'s locally recorded media_id is no longer in the draft box, switching to the same-titled ${matches[0].mediaId}`);
       } else if (st.status === 'drafted') {
         gone++;
         st.status = 'published';
         st.updatedAt = new Date().toISOString();
-        info(`  · 第 ${issue.order} 期「${issue.title}」的草稿已不在草稿箱 → 视为**已发表**(也可能被手工删了)`);
+        info(`  · Issue ${issue.order} "${issue.title}"'s draft is no longer in the draft box → treated as **published**(it may also have been deleted by hand)`);
       }
     } else if (matches.length > 0) {
       recovered++;
       st.draftId = matches[0].mediaId;
       st.status = 'drafted';
       st.title = issue.title;
-      info(`  · 第 ${issue.order} 期「${issue.title}」草稿箱里有(本地没记),已补记 ${matches[0].mediaId}`);
+      info(`  · Issue ${issue.order} "${issue.title}" is in the draft box(not recorded locally), backfilled ${matches[0].mediaId}`);
     } else {
       notYet++;
     }
@@ -646,25 +638,25 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
     const cover = drafts.data.find((d) => d.thumbMediaId);
     if (cover) {
       state.coverImage = cover.thumbMediaId;
-      success(`  ✔ 记下封面 thumb_media_id=${cover.thumbMediaId}(来自草稿「${cover.title}」)`);
+      success(`  ✔ Recorded the cover thumb_media_id=${cover.thumbMediaId}(from draft "${cover.title}")`);
     }
   }
 
   if (!saveStateOrReport(ready.stateFile, state)) return 1;
 
   info('');
-  header('对账结果');
-  info(`  草稿箱里已建: ${onDraft + recovered} 期`);
-  info(`  还没建:       ${notYet} 期`);
-  if (gone > 0) info(`  草稿已不在(视为已发表): ${gone} 期`);
-  if (dup > 0) error(`  重复草稿:     ${dup} 期(去草稿箱删掉多余的,或直接忽略:内容一样)`);
-  if (changed > 0) error(`  标题不一致:   ${changed} 期`);
+  header('Reconciliation result');
+  info(`  Created in the draft box: ${onDraft + recovered} issues`);
+  info(`  Not created yet:          ${notYet} issues`);
+  if (gone > 0) info(`  Draft no longer present(treated as published): ${gone} issues`);
+  if (dup > 0) error(`  Duplicate drafts:         ${dup} issues(delete the extras from the draft box, or just ignore them: the content is the same)`);
+  if (changed > 0) error(`  Title mismatch:           ${changed} issues`);
   if (orphans.length > 0) {
-    dim(`  草稿箱里与本系列无关的草稿 ${orphans.length} 条:`);
+    dim(`  Drafts in the draft box unrelated to this series: ${orphans.length}`);
     for (const o of orphans.slice(0, 10)) dim(`    ${o.mediaId}  ${o.title}`);
   }
-  if (state.coverImage) info(`  封面 thumb_media_id: ${state.coverImage}`);
-  else error('  还没有封面 —— 建草稿时建议先在后台手动排 1 期并设好封面');
+  if (state.coverImage) info(`  Cover thumb_media_id: ${state.coverImage}`);
+  else error('  No cover yet — when creating drafts it is recommended to first manually schedule 1 issue in the backend and set a cover');
   return 0;
 }
 
@@ -681,15 +673,15 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
   }
   const targets = selected;
 
-  // 长度/标题/摘要的问题在 loadIssues 里已经全部暴露过(会在建任何草稿之前就报错停住)
+  // Length/title/digest problems have already all surfaced in loadIssues(it errors out and stops before creating any draft)
   const tooLong = targets.filter((i) => i.content.length > i.limit);
   if (tooLong.length > 0) {
-    error(`有 ${tooLong.length} 期超过上限,先解决: ${tooLong.map((i) => i.id).join(', ')}`);
+    error(`${tooLong.length} issues exceed the limit, fix them first: ${tooLong.map((i) => i.id).join(', ')}`);
     return 1;
   }
 
-  header('建草稿');
-  info(`  共 ${targets.length} 期 · 间隔 ${opts.delayMs ?? cfg.delayMs}ms`);
+  header('Create drafts');
+  info(`  ${targets.length} issues · interval ${opts.delayMs ?? cfg.delayMs}ms`);
   info('');
 
   const cover = await resolveCover(ready, opts, hooks);
@@ -705,23 +697,21 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
     const st = ensureArticle(state, issue.id, issue.contentHash);
 
     if (st.status === 'published') {
-      dim(`  ✓ 第 ${issue.order} 期已发表过,跳过`);
+      dim(`  ✓ Issue ${issue.order} has already been published, skipping`);
       skipped++;
       continue;
     }
-    // ⚠️ `!opts.force` 这个条件必须在**这一行**:内容没变时也要能被 --force 重建。
-    // (踩过:改渲染器不改 markdown,哈希就相等,于是 --force 被上面这条跳过吃掉,
-    //  永远重建不了 —— 只好像下面这样把它显式排除在「已是最新」之外。)
+    // ⚠️ `!opts.force` MUST stay on this line: --force must rebuild even when the hash is
+    // unchanged(a renderer-only change leaves the hash equal), otherwise the skip above swallows it.
     if (st.status === 'drafted' && st.draftId && st.contentHash === issue.contentHash && !opts.force) {
-      dim(`  ✓ 第 ${issue.order} 期草稿已建(${st.draftId}),跳过`);
+      dim(`  ✓ Issue ${issue.order}'s draft already exists(${st.draftId}), skipping`);
       skipped++;
       continue;
     }
-    // 内容(正文或摘要)改过了 —— **就地更新**,不删重建。
-    // 删+建会换掉 media_id,期间那一期在草稿箱里是不存在的,中途失败就真丢了;
-    // 而「改了摘要」是最常发生的一类改动(改配置里的 digests 就会触发),不该走那条重路。
+    // Content changed(body or digest)→ **update in place**: delete+create would swap the
+    // media_id, leaving the issue absent from the draft box mid-operation and truly lost on failure.
     if (st.status === 'drafted' && st.draftId && st.contentHash !== issue.contentHash && !opts.force) {
-      const sp = startSpinner(`更新第 ${issue.order} 期草稿(${issue.title})`);
+      const sp = startSpinner(`Updating issue ${issue.order}'s draft(${issue.title})`);
       const upd = await wechat.updateDraft(
         st.draftId,
         {
@@ -736,31 +726,31 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
         hooks,
       );
       if (!upd.ok) {
-        sp.stopError('更新草稿失败');
+        sp.stopError('Failed to update draft');
         error(upd.errMsg);
         error(wechat.errorHint(upd.kind, upd.errMsg));
         info('');
-        info(`  草稿 ${st.draftId} 仍是旧内容,没有丢。重跑可继续;`);
-        info('  若这个接口在个人号上不可用,加 --force 会删掉它整篇重建。');
+        info(`  Draft ${st.draftId} still has the old content, nothing was lost. Rerun to continue;`);
+        info('  If this API is unavailable on a personal account, adding --force will delete it and rebuild the whole thing.');
         return 1;
       }
       st.contentHash = issue.contentHash;
       st.title = issue.title;
       st.updatedAt = new Date().toISOString();
       if (!saveStateOrReport(stateFile, state)) {
-        sp.stopError('状态写入失败');
+        sp.stopError('Failed to write state');
         return 1;
       }
-      sp.stopSuccess(`第 ${issue.order} 期已更新 media_id=${st.draftId}`);
+      sp.stopSuccess(`Issue ${issue.order} updated media_id=${st.draftId}`);
       updated++;
       if (opts.delayMs ?? cfg.delayMs) await delay(opts.delayMs ?? cfg.delayMs);
       continue;
     }
     if (st.draftId && opts.force) {
-      dim(`  · 删掉旧草稿 ${st.draftId}`);
+      dim(`  · Deleting old draft ${st.draftId}`);
       const del = await wechat.deleteDraft(st.draftId, options, hooks);
       if (!del.ok) {
-        error(`删除旧草稿失败: ${del.errMsg}`);
+        error(`Failed to delete the old draft: ${del.errMsg}`);
         error(wechat.errorHint(del.kind, del.errMsg));
         return 1;
       }
@@ -769,7 +759,7 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
       if (!saveStateOrReport(stateFile, state)) return 1;
     }
 
-    const sp = startSpinner(`建第 ${issue.order} 期草稿(${issue.title})`);
+    const sp = startSpinner(`Creating issue ${issue.order}'s draft(${issue.title})`);
     const res = await wechat.addDraft(
       {
         title: issue.title,
@@ -783,51 +773,50 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
       hooks,
     );
     if (!res.ok) {
-      sp.stopError('建草稿失败');
+      sp.stopError('Failed to create draft');
       error(res.errMsg);
       error(wechat.errorHint(res.kind, res.errMsg));
       info('');
-      info(`  已建的草稿都在,重跑会跳过它们继续建剩下的。`);
+      info(`  All drafts created so far are still there; rerunning will skip them and continue with the rest.`);
       return 1;
     }
-    // 先落盘再继续:任何时刻中断,最多损失一期的进度
+    // Save to disk before continuing: if interrupted at any moment, at most one issue of progress is lost
     st.status = 'drafted';
     st.draftId = res.data;
     st.title = issue.title;
     st.contentHash = issue.contentHash;
     st.updatedAt = new Date().toISOString();
     if (!saveStateOrReport(stateFile, state)) {
-      sp.stopError('状态写入失败');
+      sp.stopError('Failed to write state');
       return 1;
     }
-    sp.stopSuccess(`第 ${issue.order} 期已建 media_id=${res.data}`);
+    sp.stopSuccess(`Issue ${issue.order} created media_id=${res.data}`);
     created++;
 
-    // 确认点:建完第 1 期停下来,让你去后台看排版。
-    // 封面已经由 coverImage 自动上传并复用到全部各期了,所以这里只剩「看排版」一件事 ——
-    // 而排版是**发出去就改不动**的(个人号没有群发接口,最终那一按在后台),值得停一次。
+    // Confirmation point: stop after issue 1 to check the layout, which cannot be changed
+    // once published(the final push is manual in the backend).
     if (created === 1 && !opts.yes && targets.length > 1) {
       info('');
-      header('已建第 1 期草稿 —— 先去后台看一眼');
-      info(`  1. 公众号后台 → 草稿箱 → 打开这篇:检查排版、代码块底色、表格、待办清单的方框`);
-      info(`  2. 顺手看一眼封面裁切(封面已自动上传,各期共用这一张)`);
-      info(`  3. 都满意后重跑(会复用已建的草稿,继续建剩下的 ${targets.length - 1} 期):`);
+      header('Issue 1 draft created — go take a look in the backend first');
+      info(`  1. Official Account backend → Drafts → open this one: check the layout, code block background, tables, the checkboxes in to-do lists`);
+      info(`  2. While you're at it, check the cover crop(the cover is already auto-uploaded and shared by all issues)`);
+      info(`  3. Once you're satisfied, rerun(it will reuse the drafts already created and continue with the remaining ${targets.length - 1} issues):`);
       info('');
       info(`     node src/publish/publish.ts wechat --drafts --yes`);
       info('');
-      info(`  要改内容的话:改完 Markdown 重跑带 --force,会删掉旧草稿重建。`);
+      info(`  To change the content: edit the Markdown and rerun with --force, which deletes the old drafts and rebuilds them.`);
       return 2;
     }
 
     if (opts.delayMs ?? cfg.delayMs) await delay(opts.delayMs ?? cfg.delayMs);
   }
 
-  header('完成');
-  info(`  本次新建 ${created} 期 · 就地更新 ${updated} 期 · 跳过 ${skipped} 期`);
+  header('Done');
+  info(`  Created ${created} issues this run · updated in place ${updated} · skipped ${skipped}`);
   const total = Object.values(state.articles).filter((s) => s.status === 'drafted' || s.status === 'published').length;
-  info(`  累计已建/已发 ${total} 期`);
+  info(`  ${total} issues created/published in total`);
   info('');
-  info(`  下一步: node src/publish/publish.ts wechat ${cfgName} --plan   # 按排期表在后台设定时发表`);
+  info(`  Next: node src/publish/publish.ts wechat ${cfgName} --plan   # set up scheduled publishing in the backend per the schedule table`);
   return 0;
 }
 
@@ -837,7 +826,7 @@ export async function run(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if ('error' in parsed) {
     error(parsed.error);
-    error('用法: node src/publish/publish.ts wechat [配置名] [--list|--build|--plan|--check|--drafts|--ip]');
+    error('Usage: node src/publish/publish.ts wechat [configName] [--list|--build|--plan|--check|--drafts|--ip]');
     return 1;
   }
   const opts = parsed;
@@ -848,7 +837,7 @@ export async function run(argv: string[]): Promise<number> {
     return 1;
   }
 
-  // ---- 不联网的子命令 ----
+  // ---- Offline subcommands ----
   if (opts.list) return runList(loaded.cfg, loaded.issues);
   if (opts.plan) return runPlan(loaded.cfg, loaded.issues);
   if (opts.build) return runBuild(loaded.cfg, loaded.cfgName, loaded.issues);
@@ -856,17 +845,17 @@ export async function run(argv: string[]): Promise<number> {
   if (opts.ip) {
     const res = await wechat.fetchEgressIp({ appId: '', appSecret: '', timeoutMs: loaded.cfg.timeoutMs });
     if (!res.ok) {
-      error(`查出口 IP 失败: ${res.errMsg}`);
+      error(`Failed to look up the egress IP: ${res.errMsg}`);
       return 1;
     }
-    header('本机公网出口 IP');
+    header("This machine's public egress IP");
     info(`  ${res.data}`);
-    info(`  把它加进 公众号后台 → 设置与开发 → 基本配置 → IP 白名单`);
-    info(`  (家用宽带 IP 会变,变了要重新加 —— 这是 API 路径唯一的日常维护点)`);
+    info(`  Add it to Official Account backend → Settings and Development → Basic Configuration → IP Whitelist`);
+    info(`  (home broadband IPs change, and a changed IP must be re-added — this is the only routine maintenance point on the API path)`);
     return 0;
   }
 
-  // ---- 以下需要密钥 ----
+  // ---- The following require keys ----
   const ready = prepareOnline(loaded, opts);
   if ('error' in ready) {
     error(ready.error);
@@ -886,4 +875,4 @@ export async function run(argv: string[]): Promise<number> {
   }
 }
 
-// 入口在 src/publish/publish.ts —— 这里只导出 run(argv),不再自己执行。
+// The entry point is in src/publish/publish.ts — this file only exports run(argv) and no longer executes itself.

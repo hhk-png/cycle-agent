@@ -1,36 +1,30 @@
 import type { PublishConfig } from '../publish-config.ts';
 
 /**
- * vLLM 教程(09~22 章)的掘金发布配置。
+ * Juejin publish config for the vLLM tutorial (chapters 09~22).
  *
- * 分类/标签 id 用下面的命令查真实值后填进来:
- *   node src/publish/publish.ts juejin --categories        # 查全部分类
- *   node src/publish/publish.ts juejin --tags vllm         # 按关键词查标签
+ * Look up real category/tag ids with `publish.ts juejin --categories` and `--tags <word>`.
  *
- * 摘要必须 50~100 字、单行纯文本,目标区间 60~90。
- * 用 `node src/publish/publish.ts juejin --list` 可以一次看到全部 14 条的字数与校验结果。
+ * Digests: 50~100 chars, single line, ideally 60~90 (see all counts with `publish.ts juejin --list`).
  */
 const config: PublishConfig = {
   sourceDir: 'vllm-toturial',
   filePrefix: 'vllm教程',
   fromNumber: 9,
 
-  // 标题用文件名去掉 .md,即 `vllm教程-09-量化` —— 与掘金上已发的 00~07 章命名一致
-  // (源文件的 H1 是 `# 09 · 量化（Quantization）`,与此不同)
+  // title = file name minus .md, e.g. `vllm教程-09-量化` (the H1 differs)
   titleSource: 'fileName',
 
-  // 以下 id 由 `node src/publish/publish.ts juejin --categories` / `--tags <词>` 实测得到(2026-09)
-  // 注意:分类「人工智能」与标签「人工智能」是两个不同的 id,别混用
-  categoryId: '6809637773935378440', // 分类:人工智能
-  // ⚠️ 最多 3 个(掘金服务端硬限制,err_no=4031),多给会直接建草稿失败
+  // ids measured 2026-09; category and tag "artificial intelligence" are different ids
+  categoryId: '6809637773935378440', // category: artificial intelligence
+  // ⚠️ max 3 (Juejin server limit, err_no=4031)
   tagIds: [
-    '6809640642101116936', // 人工智能
+    '6809640642101116936', // artificial intelligence
     '7257794499869573175', // LLM
-    '6809640679082295303', // 深度学习
+    '6809640679082295303', // deep learning
   ],
 
-  // 封面:留空表示不预设。首篇草稿建好后你在编辑器里手动设置封面,
-  // 脚本会从草稿把 cover_image URL 读回来,复用到其余 13 篇。
+  // Cover: empty = not preset; set it on the first draft and the other 13 reuse its URL.
   coverImage: '',
 
   delayMs: 5000,

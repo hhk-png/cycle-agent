@@ -3,54 +3,49 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * 扫描教程目录、把 Markdown 拆成「标题 + 正文」,并做摘要字数校验。
+ * Scans the tutorial directory, splits Markdown into "title + body", and validates brief length.
  *
- * ⚠️ 本文件是整套流程里**唯一能静默摧毁内容**的地方,改动前请先读这一段。
- *
- * 教程正文的代码块里有大量以 `# ` 开头的行(bash 注释,如 `# 启动服务`),
- * 实测 14 篇中有 1~18 处(第 20 章有 18 处)。任何「删掉所有 `# ` 行」的写法
- * 都会把这些代码示例一起删掉。所以取标题**必须用围栏感知的 findTitleLine**。
+ * ⚠️ The only place in the pipeline that can silently destroy content. Code blocks contain lines
+ * starting with `# ` (bash comments; measured 1~18 per article), so title detection must use the
+ * fence-aware findTitleLine.
  */
 
-/** 摘要字数下限(按码点计) */
+/** Minimum brief length (code points) */
 export const BRIEF_MIN = 50;
-/** 摘要字数上限(按 UTF-16 码元计) */
+/** Maximum brief length (UTF-16 code units) */
 export const BRIEF_MAX = 100;
-/** 建议区间:留出余量,避免踩边界 */
+/** Recommended range, clear of the boundaries */
 export const BRIEF_SAFE_MIN = 60;
 export const BRIEF_SAFE_MAX = 90;
 
-/** 一篇待发布的文章 */
+/** One article pending publication */
 export interface Article {
-  /** 两位编号,如 '09' */
+  /** Two-digit number, e.g. '09' */
   no: string;
-  /** 数值编号,用于排序 */
+  /** Numeric number, used for sorting */
   order: number;
-  /** 文件名(不含目录) */
+  /** File name (without directory) */
   fileName: string;
-  /** 绝对路径 */
+  /** Absolute path */
   filePath: string;
-  /** 发布用的标题。来源由 TitleSource 决定(原文 H1 或文件名) */
+  /** Title used for publishing; source decided by TitleSource */
   title: string;
-  /** 原文 H1 标题,逐字取自源文件(去掉 `# ` 前缀);不受 titleSource 影响 */
+  /** Original H1, verbatim minus the `# ` prefix; unaffected by titleSource */
   h1Title: string;
-  /** 文件名去掉 `.md`,如 `vllm教程-09-量化` */
+  /** File name minus `.md`, e.g. `vllm教程-09-量化` */
   fileNameTitle: string;
-  /** Markdown 正文:去掉 H1 行,保留开头「仓库地址」行 */
+  /** Markdown body: H1 line removed, leading "repository address" line kept */
   content: string;
-  /** 标题+正文的 sha256,用于发现「草稿建好后正文又被改过」 */
+  /** sha256 of title+body, to detect later body edits */
   contentHash: string;
 }
 
-/** 去掉 BOM、把 CRLF 归一成 LF —— Windows 仓库里不做这步,标题会带一个尾随 \r */
+/** Strip BOM and normalize CRLF to LF (without this, Windows titles carry a trailing \r) */
 function normalize(raw: string): string {
   return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n');
 }
 
-/**
- * 找出真正的一级标题行号(0 基),跳过 ``` / ~~~ 围栏内的 `# 注释`。
- * 找不到返回 -1。
- */
+/** Finds the real H1 line index (0-based), skipping `# comments` in ``` / ~~~ fences; -1 if absent. */
 export function findTitleLine(lines: string[]): number {
   let fence: string | null = null;
   for (let i = 0; i < lines.length; i++) {
@@ -66,11 +61,8 @@ export function findTitleLine(lines: string[]): number {
 }
 
 /**
- * 取章节引言(教程的「> 本章目标：…」),供 --suggest-briefs 出素材。
- *
- * 只在 **H1 之后、第一个二级标题之前** 找引用块 —— 正文中段的提示框
- * (如「注：…」「关键：…」)不是引言,当成素材会误导。09/10/11 三章
- * 直接以 `## x.1` 开头,没有引言,这里返回空串是对的。
+ * Returns the chapter intro (the "> Chapter goals: …" blockquote) for --suggest-briefs. Only searches
+ * after the H1 and before the first `## ` —— mid-body callouts ("Note: …") are not intros.
  */
 export function extractIntro(content: string): string {
   const scopable = content.split('\n');
@@ -80,46 +72,44 @@ export function extractIntro(content: string): string {
   return line ? line.replace(/^>\s*/, '').trim() : '';
 }
 
-/** 摘要字数:码点与 UTF-16 码元两种口径 */
+/** Brief length: code points and UTF-16 code units */
 export function countBrief(brief: string): { cp: number; u16: number } {
   const s = brief.trim();
   return { cp: [...s].length, u16: s.length };
 }
 
 /**
- * 校验摘要,返回错误描述或 null。
- *
- * 掘金后端是 Java,`@Length(min=50,max=100)` 与 JS 的 str.length 一样数 UTF-16 码元;
- * 若服务端用码点数则 [...s].length 才准。纯中文两者相等,emoji/生僻字才分叉。
- * 稳健规则:**下限按码点、上限按 UTF-16 码元**(码点 ≤ 码元,两个方向都安全)。
+ * Validates the brief; returns an error description or null.
+ * Juejin's Java `@Length(min=50,max=100)` counts UTF-16 code units like JS str.length. Robust rule:
+ * lower bound by code points, upper bound by UTF-16 code units.
  */
 export function briefProblem(brief: string): string | null {
   const s = brief.trim();
-  if (!s) return '摘要为空';
-  if (/[\r\n]/.test(s)) return '摘要必须是单行(掘金按纯文本展示,换行会被压掉)';
+  if (!s) return 'Brief is empty';
+  if (/[\r\n]/.test(s)) return 'The brief must be a single line (Juejin displays it as plain text, line breaks get collapsed)';
   const { cp, u16 } = countBrief(s);
-  if (cp < BRIEF_MIN) return `摘要 ${cp} 字(码点) 少于 ${BRIEF_MIN},掘金会拒绝`;
-  if (u16 > BRIEF_MAX) return `摘要 ${u16} 字符(UTF-16) 超过 ${BRIEF_MAX},掘金会拒绝`;
+  if (cp < BRIEF_MIN) return `Brief is ${cp} characters (code points), fewer than ${BRIEF_MIN}; Juejin will reject it`;
+  if (u16 > BRIEF_MAX) return `Brief is ${u16} characters (UTF-16), more than ${BRIEF_MAX}; Juejin will reject it`;
   return null;
 }
 
-/** 是否贴近边界(软提示,不是硬拦) */
+/** Near the boundary (soft warning, not a hard block) */
 export function briefTight(brief: string): boolean {
   const { cp, u16 } = countBrief(brief);
   return cp < BRIEF_SAFE_MIN || u16 > BRIEF_SAFE_MAX;
 }
 
-/** 摘要里是否有 markdown 标记(掘金按纯文本展示,只是警告) */
+/** Whether the brief contains markdown markup (Juejin renders plain text; warning only) */
 export function briefHasMarkdown(brief: string): boolean {
   return /[*`#>]/.test(brief);
 }
 
-/** 把前缀里的正则元字符转义,避免配置里的前缀写法炸掉匹配 */
+/** Escape regex metacharacters in the prefix */
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** 解析后的源文件 */
+/** A parsed source file */
 interface SourceFile {
   no: string;
   order: number;
@@ -128,14 +118,11 @@ interface SourceFile {
 }
 
 /**
- * 扫目录,收集 `<前缀>-<编号>-<标题>.md` 形式的文件。
- *
- * `filePrefix` 允许为空 —— ai-agent-toturial 的文件就叫 `00-前言与导读.md`,
- * 没有系列前缀。此前缀为空时退化成 `^<编号>-<标题>.md$`,并且**只**扫顶层目录
- * (mini-agent/README.md 这种子目录里的文件本来也匹配不上)。
+ * Collects `<prefix>-<number>-<title>.md` files. `filePrefix` may be empty (e.g. ai-agent-toturial's
+ * `00-前言与导读.md`); an empty prefix scans only the top-level directory.
  */
 function scanSourceDir(dir: string, filePrefix: string): { files: SourceFile[] } | { error: string } {
-  if (!existsSync(dir)) return { error: `源目录不存在: ${dir}` };
+  if (!existsSync(dir)) return { error: `Source directory does not exist: ${dir}` };
   const re = filePrefix
     ? new RegExp(`^${escapeRegExp(filePrefix)}-(\\d+)-.+\\.md$`)
     : new RegExp(`^(\\d+)-.+\\.md$`);
@@ -151,29 +138,25 @@ function scanSourceDir(dir: string, filePrefix: string): { files: SourceFile[] }
     });
   }
   if (files.length === 0) {
-    return { error: `${dir} 下没有匹配 ${filePrefix ? `${filePrefix}-` : ''}<编号>-*.md 的文件` };
+    return { error: `No files matching ${filePrefix ? `${filePrefix}-` : ''}<number>-*.md found under ${dir}` };
   }
   return { files };
 }
 
 /**
- * 标题取哪里:
- *  · `h1`       —— 源文件的一级标题,如 `# 09 · 量化（Quantization）`
- *  · `fileName` —— 文件名去掉 `.md`,如 `vllm教程-09-量化`
- *
- * 掘金上 00~07 章用的是 `fileName` 这种(系列名+编号+短标题),
- * 为了前后一致,09 章之后也走同一套命名。
+ * Where the title comes from: `h1` (the source's H1) or `fileName` (file name minus `.md`).
+ * Juejin chapters 00~07 use `fileName` (series + number + short title); from 09 on, the same scheme is
+ * kept for consistency.
  */
 export type TitleSource = 'h1' | 'fileName';
 
 /**
- * 载入编号 >= fromNumber 的全部文章,按编号数值升序。
- * 编号有重复(同名编号两个文件)时直接报错 —— 那会让幂等状态串台。
+ * Loads all articles with number >= fromNumber, ascending. Duplicate numbers are a hard error (they
+ * would cross-wire the idempotent state).
  *
- * `titlePrefix` 只在 `titleSource: 'fileName'` 时起作用,用来给标题补一个
- * 系列名前缀。给 ai-agent-toturial 用:它的文件名是 `00-前言与导读`,
- * 补成 `ai-agent教程-00-前言与导读`,与已发的 `vllm教程-XX`/`ray教程-XX` 排成一套。
- * 之所以加这一项而不是改文件名:README 里 23 条章节链接按文件名写死,改名会全部失效。
+ * `titlePrefix` applies only with `titleSource: 'fileName'`, adding a series-name prefix
+ * (ai-agent-toturial's `00-前言与导读` → `ai-agent教程-00-前言与导读`). Chosen over
+ * renaming files because the README's 23 chapter links are hard-coded by file name.
  */
 export function loadArticles(
   sourceDir: string,
@@ -190,36 +173,36 @@ export function loadArticles(
     if (f.order < fromNumber) continue;
     const dup = seen.get(f.no);
     if (dup) {
-      return { error: `编号 ${f.no} 匹配到多个文件: ${dup.fileName}、${f.fileName}` };
+      return { error: `Number ${f.no} matches multiple files: ${dup.fileName}, ${f.fileName}` };
     }
     seen.set(f.no, f);
   }
   if (seen.size === 0) {
-    return { error: `${sourceDir} 下没有编号 >= ${fromNumber} 的文件` };
+    return { error: `No files with number >= ${fromNumber} found under ${sourceDir}` };
   }
 
   const picked = [...seen.values()].sort((a, b) => a.order - b.order);
 
-  // 连续性检查:fromNumber..max 之间不该缺号
+  // Continuity check: there should be no gaps between fromNumber..max
   const max = picked[picked.length - 1].order;
   const missing: number[] = [];
   for (let n = fromNumber; n <= max; n++) {
     if (!picked.some((f) => f.order === n)) missing.push(n);
   }
   if (missing.length > 0) {
-    return { error: `编号不连续,缺少: ${missing.join(', ')}` };
+    return { error: `Numbers are not contiguous, missing: ${missing.join(', ')}` };
   }
 
   const articles: Article[] = [];
   for (const f of picked) {
     const lines = f.text.split('\n');
     const idx = findTitleLine(lines);
-    if (idx < 0) return { error: `${f.fileName} 找不到一级标题(# )` };
+    if (idx < 0) return { error: `${f.fileName} has no H1 title (# )` };
     const h1Title = lines[idx].replace(/^# /, '').trim();
     const fileNameTitle = f.fileName.replace(/\.md$/, '');
     const title = titleSource === 'fileName' ? `${titlePrefix}${fileNameTitle}` : h1Title;
 
-    // 只删「标题行 + 紧随的一个空行」,绝不全局压缩空行 —— 那会改动代码块内的内容
+    // Remove only the title line and its one trailing blank line; never collapse blank lines globally (it would alter code blocks)
     const kept = lines.slice();
     kept.splice(idx, 1);
     if (kept[idx] === '') kept.splice(idx, 1);

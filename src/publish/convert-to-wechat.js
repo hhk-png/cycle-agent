@@ -1,20 +1,18 @@
 /**
- * 微信公众号文章格式转换脚本
- * 将 Markdown 文件转换为微信公众号编辑器兼容的 HTML（含代码语法高亮）
- *
- * 使用方法: node convert-to-wechat.js
- * 输出目录: ./wechat-formatted/
+ * Converts Markdown files to WeChat-editor-compatible HTML with code highlighting.
+ * Usage: node convert-to-wechat.js  →  ./wechat-formatted/
  */
 
 const fs = require("fs");
 const path = require("path");
 
-// ── 配置 ──────────────────────────────────────────────
+// ── Config ──────────────────────────────────────────────
 const INPUT_DIR = __dirname;
 const OUTPUT_DIR = path.join(__dirname, "wechat-formatted");
-const EXCLUDE_PATTERN = "文章摘要";
+// Chinese "article summary" filename filter (escaped to keep this file ASCII)
+const EXCLUDE_PATTERN = "\u6587\u7ae0\u6458\u8981";
 
-// ── 微信公众号兼容的 CSS 样式 ──────────────────────────
+// ── WeChat-compatible CSS styles ──────────────────────────
 const WECHAT_CSS = {
   wrapper: 'font-family: -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Helvetica Neue, Helvetica, Arial, sans-serif; font-size: 16px; color: #3f3f3f; line-height: 1.8; letter-spacing: 0.5px; word-break: break-word;',
 
@@ -48,36 +46,36 @@ const WECHAT_CSS = {
 };
 
 // ══════════════════════════════════════════════════════════
-//  语法高亮系统（微信兼容版 — 使用 font 标签代替 span+style）
+//  Syntax highlighting system (WeChat-compatible — uses font tags instead of span+style)
 // ══════════════════════════════════════════════════════════
 
-// 配色 — 背景 #0d1117，针对公众号 HTML 渲染优化
-// 原则：颜色多但都落在「短小分散」的 token 上，避免大片同色。
+// Color scheme — background #0d1117, optimized for WeChat public account HTML rendering
+// Principle: many colors, but all on "short, scattered" tokens, avoiding large blocks of one color.
 const HL = {
-  keyword:  "#ff7b72",   // 关键字 — 红 (粗体)
-  control:  "#ff7b72",   // 控制流 — 红
-  string:   "#a5d6ff",   // 短字符串 — 浅蓝
-  comment:  "#a8b3c2",   // 注释 — 浅灰 (斜体)
-  number:   "#79c0ff",   // 数字 — 蓝
-  literal:  "#79c0ff",   // 字面量 — 蓝
-  func:     "#d8b4fe",   // 函数调用 — 亮紫
-  type:     "#86efac",   // 类型/类名 — 亮绿
-  operator: "#ffb86c",   // 运算符 — 橙
-  builtin:  "#e3b341",   // 内置对象/命令 — 金黄
-  var:      "#56d8c4",   // 变量($x) — 青
-  decorator:"#ff9f43",   // 装饰器 @xxx — 深橙
-  regex:    "#a5d6ff",   // 正则 — 浅蓝
-  constant: "#79c0ff",   // 常量/选项 — 蓝
-  meta:     "#ff9f43",   // 装饰器 — 深橙
+  keyword:  "#ff7b72",   // keyword — red (bold)
+  control:  "#ff7b72",   // control flow — red
+  string:   "#a5d6ff",   // short string — light blue
+  comment:  "#a8b3c2",   // comment — light gray (italic)
+  number:   "#79c0ff",   // number — blue
+  literal:  "#79c0ff",   // literal — blue
+  func:     "#d8b4fe",   // function call — bright purple
+  type:     "#86efac",   // type/class name — bright green
+  operator: "#ffb86c",   // operator — orange
+  builtin:  "#e3b341",   // built-in object/command — gold
+  var:      "#56d8c4",   // variable ($x) — cyan
+  decorator:"#ff9f43",   // decorator @xxx — dark orange
+  regex:    "#a5d6ff",   // regex — light blue
+  constant: "#79c0ff",   // constant/option — blue
+  meta:     "#ff9f43",   // decorator — dark orange
 };
 
-// 附加文字样式标签
+// Additional text style tags
 const HL_TAG = {
   keyword: "b",
   comment: "i",
 };
 
-// 用 font 标签包裹（微信兼容，避免 style="..." 被拆解）
+// Wrap with a font tag (WeChat-compatible, avoids style="..." being taken apart)
 function wrapHL(text, colorKey) {
   const color = HL[colorKey] || "white";
   const tag = HL_TAG[colorKey];
@@ -87,90 +85,83 @@ function wrapHL(text, colorKey) {
   return html;
 }
 
-// 所有「保护区域」的原始匹配 → 替换后二次处理
-//
-// 优化说明（相比旧版「顺序 replace + 占位符」）：
-//  1. 单遍、确定性：先一次性收集所有规则(region/token)的匹配，再按
-//     「起始位置 + 优先级」贪心合并，保证每个字符最多被上色一次，
-//     彻底消除二次包裹 / 重叠标签。
-//  2. 优先级 = 数组顺序：region(字符串/注释) 永远排在 token 之前，
-//     因此字符串、注释内部的关键字不会被误上色（天然遮蔽）。
-//  3. 不再依赖占位符字符，避免占位符被后续正则误吞。
+// Single pass: collect all region/token matches, then greedily merge by start position
+// and priority, so each character is colored at most once (no double-wrap/overlap).
+// Regions (strings/comments) rank before tokens, masking keywords inside them; no
+// placeholder characters to be swallowed by later regexes.
 function highlightCode(rawCode, lang) {
   if (!rawCode || rawCode.trim() === "") return "";
 
   const def = getLangDef(lang);
-  if (!def) return escapeHtml(rawCode); // 未知语言，仅转义
+  if (!def) return escapeHtml(rawCode); // unknown language, escape only
 
-  // 合并所有规则：regions 在前（高优先级），tokens 依次在后
+  // Merge all rules: regions first (high priority), tokens after in order
   const rules = [];
   for (const r of def.regions) rules.push({ re: r.re, colorKey: r.colorKey, ok: r.ok, order: rules.length });
   for (const t of def.tokens) rules.push({ re: t.re, colorKey: t.colorKey, ok: t.ok, order: rules.length });
 
-  // ── 收集所有规则的匹配 ──────────────────────────
+  // ── Collect matches for all rules ──────────────────────────
   const events = [];
   for (const rule of rules) {
     rule.re.lastIndex = 0;
     let m;
     while ((m = rule.re.exec(rawCode)) !== null) {
-      if (m[0].length === 0) { rule.re.lastIndex++; continue; } // 防死循环
-      if (rule.ok && !rule.ok(m[0])) continue; // 长度/换行过滤
+      if (m[0].length === 0) { rule.re.lastIndex++; continue; } // avoid infinite loop
+      if (rule.ok && !rule.ok(m[0])) continue; // length/newline filter
       events.push({ start: m.index, end: m.index + m[0].length, rule });
     }
   }
 
-  // 按起始位置排序；同一起始位置按优先级(数组顺序)取更早的
+  // Sort by start position; for the same start position take the earlier one by priority (array order)
   events.sort((a, b) => a.start - b.start || a.rule.order - b.rule.order);
 
-  // 贪心合并：优先取最早开始、同起点取高优先级，跳过所有重叠区间
+  // Greedy merge: prefer the earliest start, and for the same start the higher priority; skip all overlapping intervals
   const spans = [];
   let curEnd = 0;
   for (const ev of events) {
-    if (ev.start < curEnd) continue; // 与已接受的区间重叠 → 丢弃
+    if (ev.start < curEnd) continue; // overlaps an already accepted interval → discard
     if (ev.end <= ev.start) continue;
     spans.push(ev);
     curEnd = ev.end;
   }
 
-  // ── 拼接 HTML：区间外原样转义，区间内按颜色包裹 ──
+  // ── Assemble HTML: escape verbatim outside intervals, wrap by color inside ──
   const out = [];
   let pos = 0;
   for (const sp of spans) {
     if (sp.start > pos) out.push(escapeHtml(rawCode.slice(pos, sp.start)));
     const t = escapeHtml(rawCode.slice(sp.start, sp.end));
-    out.push(sp.rule.colorKey ? wrapHL(t, sp.rule.colorKey) : t); // colorKey===null → 屏蔽为纯文本
+    out.push(sp.rule.colorKey ? wrapHL(t, sp.rule.colorKey) : t); // colorKey===null → mask as plain text
     pos = sp.end;
   }
   if (pos < rawCode.length) out.push(escapeHtml(rawCode.slice(pos)));
   return out.join("");
 }
 
-// ── 语言定义 ──────────────────────────────────────────
+// ── Language definitions ──────────────────────────────────────────
 
-// ── 高亮采用「最小化配色」策略 ──────────────────────────
-// 只给短小的关键字 / 字面量 / 数字 / 函数调用单独上色，
-// 不再把整段字符串、整段命令列表等长内容统一涂成一种颜色，
-// 从而彻底消除「一大片相同颜色」的问题。注释用灰色单独区分。
+// Color only short keywords/literals/numbers/calls, never whole strings or command
+// lists, to avoid large blocks of one color. Comments get their own gray.
 
 const RE = {
-  // 注释
+  // comments
   blockComment: /\/\*[\s\S]*?\*\//g,
   lineComment: /\/\/.*/g,
   hashComment: /#.*/g,
-  // 字符串定界符（配合「短字符串」过滤器，只在短且无换行时上色）
+  // string delimiters (paired with the "short string" filter, colored only when short and newline-free)
   dq: /"(?:[^"\\\n]|\\.)*"/g,
   sq: /'(?:[^'\\\n]|\\.)*'/g,
   tick: /`(?:[^`\\\n]|\\.)*`/g,
   tripleDQ: /"""[\s\S]*?"""/g,
   tripleSQ: /'''[\s\S]*?'''/g,
-  // 数字
+  // numbers
   jsNumber: /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?n?\b/g,
   plainNumber: /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g,
   pyNumber: /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?j?\b/g,
   intNumber: /\b\d+\b/g,
   rustNumber: /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?(?:i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|usize|isize)?\b/g,
   goNumber: /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?i?\b/g,
-  // 其他 token
+  // other tokens
   funcIdent: /\b([a-zA-Z_$][a-zA-Z0-9_$]*)(?=\s*\()/g,
   pyFuncIdent: /\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\s*\()/g,
   typeIdent: /\b[A-Z][A-Za-z0-9_]*\b/g,
@@ -191,24 +182,22 @@ function makeWordRe(wordList) {
   return new RegExp(`\\b(?:${wordList.map(escapeRe).join("|")})\\b`, "g");
 }
 
-// 构造一份语言定义。
-// regions  : 注释(灰斜体) + 需屏蔽的长字符串(不上色)
-// tokens   : 只含短小 token —— 关键字/字面量/内置/变量/装饰器/短字符串/类型/数字/运算符/函数
-// 说明：字符串用「长度过滤」——≤24 且无换行才上色；更长或跨行的字符串则屏蔽为纯文本，
-//       这样既加了字符串高亮，又不会重新出现「一整片字符串同色」的问题。
+// Build a language definition: regions (comments + long strings to mask) and short tokens.
+// Strings are colored only if <=24 chars and newline-free; longer ones are masked as
+// plain text so string highlighting never becomes a block of one color.
 function makeLang({
-  comments = [],            // 注释正则（灰斜体）
-  plainRegions = [],        // 需屏蔽但不上色的正则（如长模板串/三引号）
+  comments = [],            // comment regexes (gray italic)
+  plainRegions = [],        // regexes to mask but not color (e.g. long template strings/triple quotes)
   keywords = [],
   literals = [],
-  builtinRe = null,         // 内置对象/命令（金黄）
-  varRe = null,             // 变量（青）
-  decoratorRe = null,       // 装饰器（深橙）
-  stringRe = [],            // 字符串定界正则（短则上色，长则屏蔽）
-  typeRe = null,            // 类型/类名（绿）
+  builtinRe = null,         // built-in objects/commands (gold)
+  varRe = null,             // variables (cyan)
+  decoratorRe = null,       // decorators (dark orange)
+  stringRe = [],            // string delimiter regexes (short → color, long → mask)
+  typeRe = null,            // type/class names (green)
   numberRe = RE.plainNumber,
-  operatorRe = null,        // 运算符（橙）
-  funcRe = null,            // 函数调用（紫）
+  operatorRe = null,        // operators (orange)
+  funcRe = null,            // function calls (purple)
 }) {
   const strRes = (Array.isArray(stringRe) ? stringRe : [stringRe]).filter(Boolean);
   const longOk = (s) => s.length > 24 || s.includes("\n");
@@ -239,7 +228,7 @@ const LANG_DEFS = {};
 // ── TypeScript / JavaScript ──────────────────────────
 LANG_DEFS.typescript = LANG_DEFS.javascript = LANG_DEFS.ts = LANG_DEFS.js = LANG_DEFS.tsx = LANG_DEFS.jsx = makeLang({
   comments: [RE.blockComment, RE.lineComment],
-  plainRegions: [RE.tick], // 模板字符串屏蔽
+  plainRegions: [RE.tick], // mask template strings
   stringRe: [RE.dq, RE.sq],
   numberRe: RE.jsNumber,
   funcRe: RE.funcIdent,
@@ -292,7 +281,7 @@ LANG_DEFS.json = LANG_DEFS.jsonc = makeLang({
 // ── Python ───────────────────────────────────────────
 LANG_DEFS.python = LANG_DEFS.py = makeLang({
   comments: [RE.hashComment],
-  plainRegions: [RE.tripleDQ, RE.tripleSQ], // 三引号 docstring/长串屏蔽
+  plainRegions: [RE.tripleDQ, RE.tripleSQ], // mask triple-quoted docstrings/long strings
   stringRe: [RE.dq, RE.sq],
   numberRe: RE.pyNumber,
   funcRe: RE.pyFuncIdent,
@@ -315,7 +304,7 @@ LANG_DEFS.python = LANG_DEFS.py = makeLang({
 // ── Rust ─────────────────────────────────────────────
 LANG_DEFS.rust = LANG_DEFS.rs = makeLang({
   comments: [RE.blockComment, RE.lineComment],
-  stringRe: [RE.dq], // 单引号是 char/生命周期，跳过
+  stringRe: [RE.dq], // single quotes are char/lifetime, skip
   numberRe: RE.rustNumber,
   funcRe: RE.pyFuncIdent,
   typeRe: RE.typeIdent,
@@ -335,7 +324,7 @@ LANG_DEFS.rust = LANG_DEFS.rs = makeLang({
 // ── Go ───────────────────────────────────────────────
 LANG_DEFS.go = LANG_DEFS.golang = makeLang({
   comments: [RE.blockComment, RE.lineComment],
-  plainRegions: [RE.tick], // 反引号 raw string 屏蔽
+  plainRegions: [RE.tick], // mask backtick raw strings
   stringRe: [RE.dq],
   numberRe: RE.goNumber,
   funcRe: RE.pyFuncIdent,
@@ -353,11 +342,11 @@ LANG_DEFS.go = LANG_DEFS.golang = makeLang({
   literals: ["nil","true","false","iota"],
 });
 
-// ── 语言名标准化 ──────────────────────────────────────
+// ── Language name normalization ──────────────────────────────────────
 function getLangDef(lang) {
   if (!lang) return null;
   const key = lang.toLowerCase().trim();
-  // 别名映射
+  // alias mapping
   const aliases = {
     "typescript": "typescript", "ts": "typescript", "tsx": "typescript",
     "javascript": "javascript", "js": "javascript", "jsx": "javascript", "mjs": "javascript", "cjs": "javascript",
@@ -375,7 +364,7 @@ function getLangDef(lang) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  Markdown → HTML 解析器
+//  Markdown → HTML parser
 // ══════════════════════════════════════════════════════════
 
 function escapeHtml(text) {
@@ -386,12 +375,12 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-// 将代码中的空格/换行/制表符转为 HTML 实体，确保微信编辑器中不丢失缩进
-// 行首缩进前插入零宽空格(&#8203;)，防止微信编辑器删除前导空白
+// Turn code whitespace into HTML entities (WeChat drops leading whitespace), inserting a
+// zero-width space (&#8203;) at line starts to preserve indentation.
 function preserveWhitespace(html) {
   let result = "";
   let inTag = false;
-  let atLineStart = true; // 是否在行首（紧跟 <br> 或文本开头）
+  let atLineStart = true; // whether at line start (right after <br> or the start of the text)
 
   function anchor() {
     if (atLineStart) {
@@ -432,7 +421,7 @@ function preserveWhitespace(html) {
   return result;
 }
 
-// ── 内联渲染 ──────────────────────────────────────────
+// ── Inline rendering ──────────────────────────────────────────
 const inlineRules = [
   { re: /!\[([^\]]*)\]\(([^)\s]+(?:\s+"[^"]*")?)\)/g, fn: (_, alt, src) => `<img src="${src}" alt="${alt}" style="max-width:100%;display:block;margin:12px auto;border-radius:4px;">` },
   { re: /\[([^\]]+)\]\(([^)\s]+)\)/g, fn: (_, text, href) => `<a href="${href}" style="${WECHAT_CSS.a}" target="_blank">${text}</a>` },
@@ -458,7 +447,7 @@ function parseMarkdown(md) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // ── 代码块 ```...``` ──────────────────────────
+    // ── Code block ```...``` ──────────────────────────
     if (/^```/.test(line.trim())) {
       const lang = line.trim().slice(3).trim();
       const codeLines = [];
@@ -477,14 +466,14 @@ function parseMarkdown(md) {
       continue;
     }
 
-    // ── 水平分割线 ────────────────────────────────
+    // ── Horizontal rule ────────────────────────────────
     if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line.trim())) {
       htmlLines.push(`<hr style="${WECHAT_CSS.hr}">`);
       i++;
       continue;
     }
 
-    // ── 表格 ──────────────────────────────────────
+    // ── Table ──────────────────────────────────────
     if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
       const tableRows = [];
       while (i < lines.length && lines[i].trim().startsWith("|") && lines[i].trim().endsWith("|")) {
@@ -495,7 +484,7 @@ function parseMarkdown(md) {
       continue;
     }
 
-    // ── 引用块 > ──────────────────────────────────
+    // ── Blockquote > ──────────────────────────────────
     if (line.startsWith(">")) {
       const quoteLines = [];
       while (i < lines.length && lines[i].startsWith(">")) {
@@ -507,7 +496,7 @@ function parseMarkdown(md) {
       continue;
     }
 
-    // ── 无序列表 ──────────────────────────────────
+    // ── Unordered list ──────────────────────────────────
     if (/^[\s]*[-*+]\s/.test(line)) {
       const listItems = [];
       while (i < lines.length && /^[\s]*[-*+]\s/.test(lines[i])) {
@@ -519,7 +508,7 @@ function parseMarkdown(md) {
       continue;
     }
 
-    // ── 有序列表 ──────────────────────────────────
+    // ── Ordered list ──────────────────────────────────
     if (/^\s*\d+[.)]\s/.test(line)) {
       const listItems = [];
       while (i < lines.length && /^\s*\d+[.)]\s/.test(lines[i])) {
@@ -531,7 +520,7 @@ function parseMarkdown(md) {
       continue;
     }
 
-    // ── 标题 ──────────────────────────────────────
+    // ── Headings ──────────────────────────────────────
     if (/^####\s/.test(line)) {
       htmlLines.push(`<h4 style="${WECHAT_CSS.h4}">${renderInline(line.replace(/^####\s/, ""))}</h4>`);
       i++; continue;
@@ -549,13 +538,13 @@ function parseMarkdown(md) {
       i++; continue;
     }
 
-    // ── 空行：跳过 ────────────────────────────────
+    // ── Blank line: skip ────────────────────────────────
     if (line.trim() === "") {
       i++;
       continue;
     }
 
-    // ── 普通段落 ──────────────────────────────────
+    // ── Normal paragraph ──────────────────────────────────
     const paraLines = [];
     while (i < lines.length && lines[i].trim() !== "" &&
       !/^(#{1,4}\s|```|>|[-*+]\s|\d+[.)]\s|\|.*\|$)/.test(lines[i]) &&
@@ -614,7 +603,7 @@ ${bodyHtml}
 </html>`;
 }
 
-// ── 主流程 ────────────────────────────────────────────
+// ── Main flow ────────────────────────────────────────────
 function main() {
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -622,7 +611,7 @@ function main() {
 
   const allFiles = fs.readdirSync(INPUT_DIR).filter(f => f.endsWith(".md") && !f.includes(EXCLUDE_PATTERN));
 
-  console.log(`找到 ${allFiles.length} 个 Markdown 文件\n`);
+  console.log(`Found ${allFiles.length} Markdown files\n`);
 
   const results = [];
 
@@ -630,7 +619,7 @@ function main() {
     const filePath = path.join(INPUT_DIR, filename);
     const mdContent = fs.readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n");
 
-    console.log(`处理: ${filename}`);
+    console.log(`Processing: ${filename}`);
 
     const bodyHtml = parseMarkdown(mdContent);
     const title = filename.replace(/\.md$/, "");
@@ -643,16 +632,16 @@ function main() {
     results.push({ input: filename, output: outFilename, path: outPath });
   }
 
-  console.log(`\n✅ 全部转换完成！输出目录: ${OUTPUT_DIR}\n`);
+  console.log(`\n✅ All conversions complete! Output directory: ${OUTPUT_DIR}\n`);
 
   for (const r of results) {
     console.log(`  ${r.input}  →  ${r.output}`);
   }
 
-  console.log(`\n📋 使用方法：`);
-  console.log(`  1. 在浏览器中打开 wechat-formatted/ 目录下的 HTML 文件`);
-  console.log(`  2. 按 Ctrl+A 全选，Ctrl+C 复制`);
-  console.log(`  3. 粘贴到微信公众号编辑器中`);
+  console.log(`\n📋 Usage:`);
+  console.log(`  1. Open the HTML files in the wechat-formatted/ directory in a browser`);
+  console.log(`  2. Press Ctrl+A to select all, Ctrl+C to copy`);
+  console.log(`  3. Paste into the WeChat public account editor`);
 }
 
 main();

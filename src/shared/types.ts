@@ -1,19 +1,19 @@
-/** claude 子进程的执行结果 */
+/** Result of the claude subprocess */
 export interface ClaudeResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
 }
 
-/** runClaude 的可选钩子 */
+/** Optional hooks for runClaude */
 export interface ClaudeHooks {
-  /** claude 每输出一块 stdout 时回调（用于实时流式打印） */
+  /** Called per stdout chunk (real-time streaming print) */
   onStdout?: (chunk: string) => void;
-  /** claude 每输出一块 stderr 时回调（用于实时流式打印，verbose 日志等） */
+  /** Called per stderr chunk (real-time streaming print, verbose logs) */
   onStderr?: (chunk: string) => void;
 }
 
-/** spinner 句柄,由 ui.startSpinner 返回 */
+/** Returned by ui.startSpinner */
 export interface SpinnerHandle {
   stopSuccess(msg: string): void;
   stopError(msg: string): void;

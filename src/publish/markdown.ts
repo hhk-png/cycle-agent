@@ -4,29 +4,21 @@ import { createContext, runInContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Markdown → 微信公众号兼容 HTML。
+ * Markdown → WeChat-compatible HTML.
  *
- * 渲染本身**不再由本文件实现**,而是调用仓库里那个独立脚本
- * `src/publish/convert-to-wechat.js`(它给代码块做 GitHub 暗色语法高亮、
- * 给标题加左侧色条、表格带斑马纹)。本文件只做三件事:
+ * Rendering lives in `src/publish/convert-to-wechat.js`; this file loads that script as a function
+ * library, fixes one code-block style rule, and guards against deformed output.
  *
- * 1. 把那个脚本当函数库加载(见 loadConverter 的说明);
- * 2. 修掉它代码块样式里会让长行被裁掉的一处(`white-space: pre`);
- * 3. 兜住一切会让正文变形的输出(见 assertNoStrippedTags)。
- *
- * ⚠️ 关于**字符数上限**:这个模块曾经导出 `WECHAT_CONTENT_LIMIT = 20000`,
- * 理由是「官方文档写 content 少于 2 万字符」。**那条不成立** —— 实测
- * `draft/add` 收下了 183,914 字符的正文并原样回读(结构标签 15 项全对上、
- * 纯文本一字不差)。早先「19979 被接受」被当成了卡在上限,其实只是巧合。
- * 详见 WECHAT_CONTENT_LIMIT 的注释。
+ * ⚠️ The old `WECHAT_CONTENT_LIMIT = 20000` ("docs say content must be under 20k chars") is false:
+ * `draft/add` accepted a 183,914-character body and read it back verbatim. See WECHAT_CONTENT_LIMIT.
  */
 
-/** 转义 HTML 文本节点。`&` 必须最先换,否则会把后面换出的实体又转一遍 */
+/** Escape HTML text nodes; `&` must be replaced first or it re-escapes the later entities */
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ============ 把那个独立脚本当函数库加载 ============
+// ============ Load the standalone script as a function library ============
 
 interface ConvertedStyles {
   wrapper: string;
@@ -42,18 +34,10 @@ interface Converter {
 let cached: Converter | null = null;
 
 /**
- * 加载 `src/publish/convert-to-wechat.js`。
- *
- * ⚠️ 为什么用 `vm` 而不是 `import`/`require`:
- * 那个脚本是**给人直接跑的独立 CLI** —— 没有 `module.exports`,而且末尾
- * 无条件调用 `main()`(它会去扫自己所在目录的 md、往 `wechat-formatted/`
- * 写文件)。直接 import 会连带触发这些副作用。
- * 我们又不想为了接进来就去改用户的脚本(那是他的文件,且可能被其他项目共用),
- * 所以这里把它当作「一段可执行的函数定义」载入:掐掉末尾的 main() 调用,
- * 再补一行 `var` 把需要的内联样式常量暴露到沙箱全局上
- * (顶层 `const` 不会成为 vm 上下文的属性,`var` 才会)。
- *
- * 脚本内部只用 `fs`/`path` 且都在函数体里,载入本身不碰磁盘。
+ * Loads `src/publish/convert-to-wechat.js` via `vm` rather than import/require: it's a hand-run CLI with
+ * no `module.exports` that calls `main()` unconditionally, so importing it would trigger side effects.
+ * We cut the main() call and append a `var` to expose the style constants on the sandbox global
+ * (top-level `const` isn't a vm context property; `var` is).
  */
 function loadConverter(): Converter {
   if (cached) return cached;
@@ -63,9 +47,8 @@ function loadConverter(): Converter {
     .replace(/\nmain\(\);\s*$/, '\n')
     .concat('\nvar __WECHAT_CSS = WECHAT_CSS;\n');
 
-  // 本模块是 ESM(`package.json` 有 "type": "module"),作用域里没有 `require`;
-  // 而那个脚本是 CommonJS 写法。用 createRequire 造一个给它,它内部
-  // `require("fs")` / `require("path")` 才解析得到。
+  // This module is ESM (no `require`); the script is CommonJS. createRequire gives it one so its
+  // internal `require("fs")`/`require("path")` resolve.
   const require = createRequire(import.meta.url);
 
   const sandbox: Record<string, unknown> = {
@@ -86,7 +69,7 @@ function loadConverter(): Converter {
   const buildPage = sandbox.buildPage;
   const styles = sandbox.__WECHAT_CSS;
   if (typeof parseMarkdown !== 'function' || typeof buildPage !== 'function' || !styles) {
-    throw new Error(`${file} 的加载结果不对:parseMarkdown/buildPage/WECHAT_CSS 有缺失`);
+    throw new Error(`Unexpected load result from ${file}: parseMarkdown/buildPage/WECHAT_CSS is missing`);
   }
   cached = {
     parseMarkdown: parseMarkdown as Converter['parseMarkdown'],
@@ -96,58 +79,42 @@ function loadConverter(): Converter {
   return cached;
 }
 
-// ============ 样式修正 ============
+// ============ Style fixes ============
 
 /**
- * 代码块的长行必须能折行。
- *
- * 脚本原本给代码块写的是 `white-space: pre` + `overflow-x: auto` ——
- * 那在浏览器预览里没问题(可以横向滚),但**公众号正文里横向滚动条不生效**,
- * 超出手机宽度的行长会被直接截断、内容看不全。本教程里有大量长命令行
- * (如 `vllm serve ... --disable-log-requests`),被裁就是真丢内容。
- *
- * `white-space: pre` 在整份输出里只出现在代码块样式这一处(已核对),
- * 所以这个替换是精确的。`word-break: break-all` 是必需的:
- * 代码里的空格被脚本换成了 `&nbsp;`(不换行空格),光靠 `pre-wrap` 折不开,
- * 得允许在任意字符处断开。
+ * Code-block long lines must wrap: the script's `white-space: pre` + `overflow-x: auto` scrolls in a
+ * browser but not in the WeChat body, where over-width lines are truncated outright. `white-space: pre`
+ * occurs only in this spot of the output, so the replacement is exact; `word-break: break-all` is needed
+ * because the script turns spaces into `&nbsp;`, which `pre-wrap` alone can't break.
  */
 function fixCodeBlockWrapping(html: string): string {
   return html.replace(/white-space:\s*pre;/g, 'white-space: pre-wrap; word-break: break-all;');
 }
 
-/**
- * 公众号会剥掉这几个标签,输出里出现说明渲染器写错了。
- * 与其等发到编辑器里才发现排版没了,不如在这里就炸掉。
- */
+/** The official account strips these tags; if they appear, the renderer is buggy, so fail here. */
 function assertNoStrippedTags(html: string): string {
   for (const tag of ['style', 'script', 'iframe', 'input']) {
     if (new RegExp(`<${tag}[\\s>]`, 'i').test(html)) {
-      throw new Error(`转换结果里出现了 <${tag}>,公众号会把它剥掉 —— 渲染器有 bug`);
+      throw new Error(`The conversion result contains <${tag}>, which the official account will strip —— the renderer has a bug`);
     }
   }
   return html;
 }
 
 /**
- * 把一段 Markdown 转成公众号正文 HTML。
- * 不返回错误 —— 转换是无损的,长度校验由调用方(wechat-issues)负责。
+ * Converts Markdown into official-account body HTML. Lossless; length validation is the caller's job.
  */
 export function mdToWechatHtml(markdown: string): string {
   const conv = loadConverter();
   const body = fixCodeBlockWrapping(conv.parseMarkdown(markdown));
-  // 外层容器带上脚本预设的整篇排版(字体/字号/行距/字距),
-  // 与它自己 buildPage 的预览一致 —— 预览看到什么,发出去就是什么。
+  // Outer container carries the script's document typography, matching its buildPage preview.
   const html = `<div style="${conv.WECHAT_CSS.wrapper}">${body}</div>`;
   return assertNoStrippedTags(html);
 }
 
 /**
- * 拆篇护栏 —— **不是接口的真实上限**。
- *
- * 官方文档写 `content` 要「少于 2 万字符」,实测不成立:`draft/add` 接受了
- * 183,914 字符并原样回读。真实天花板没探到,而这个教程最长的章(18,附录C)
- * 渲染后 183,914 字符 —— 所以这里把一个远高于实际需要的数当护栏,
- * 正常情况**永远不会触发拆分**(即一章 = 一期)。
- * 万一将来某章大到离谱,它仍会兜住、拆成两期而不是静默失败。
+ * Split guardrail —— not the API's real limit: `draft/add` accepted 183,914 characters, and the longest
+ * chapter renders to exactly that. So this sits far above actual need and never triggers a split in
+ * practice, but still catches an absurdly large chapter instead of failing silently.
  */
 export const WECHAT_CONTENT_LIMIT = 500_000;

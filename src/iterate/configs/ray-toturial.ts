@@ -1,12 +1,11 @@
-// 本教程的完整配置。配置名 = 文件名(src/iterate/configs/ray-toturial.ts → ray-toturial)。
-// 运行: node src/iterate/run.ts ray-toturial
-// 新建其他教程: 复制本文件改名,再修改里面的字段即可。
+// Config name = file name; run with `node src/iterate/run.ts ray-toturial`.
+// To add a tutorial, copy this file, rename it, and edit the fields.
 
 import type { TutorialConfig } from '../config.ts';
 
 const config: TutorialConfig = {
   title: '教程迭代',
-  targetDir: 'ray-toturial', // 目标目录名(结果保存到 ./ray-toturial/ 下)
+  targetDir: 'ray-toturial', // results go under ./ray-toturial/
   claudeFlags: [
     '-p',
     '--output-format',
@@ -16,8 +15,8 @@ const config: TutorialConfig = {
     '--dangerously-skip-permissions',
     '--verbose',
   ],
-  startAt: 1, // 起始轮次,默认 1;>1 时所有轮次都用精炼模板续跑
-  dryRun: false, // true 时只打印每轮提示词,不调用 claude(验证用)
+  startAt: 1, // start round; >1 resumes all rounds with the refine template
+  dryRun: false, // true = print each round's prompt only (no claude)
   description:
     '生成一个ray的教程，以章节的形式呈现，使用markdown。并且在其中需要包括一个简版的ray的实现，这个实现需要按照工程化的思路实现，要包含ray的所有的内容，并且可以运行，这个需要写完之后验证。教程也要包括所有的内容，现在的实现以及未来的方向和实现。尽可能的包括全部的信息',
   maxIterations: 10,

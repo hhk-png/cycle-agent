@@ -3,91 +3,86 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 /**
- * 掘金(非官方)接口客户端 —— 全项目唯一的网络层。
- *
- * 这些接口靠抓包得来,没有官方文档,随时可能变。所有请求都集中在这里,
- * 便于实测调整请求头与端点。
- *
- * 约定:所有函数**永不抛异常**,失败一律用 JuejinResult 表达(对标 claude.ts 的 ClaudeResult),
- * 调用侧统一写 `if (!res.ok) { ... }`。
+ * Juejin (unofficial) API client — the project's only network layer.
+ * Endpoints are reverse-engineered from packet captures: no official docs, may change at any time.
+ * Convention: functions never throw; failures are returned as JuejinResult and callers check `if (!res.ok)`.
  */
 
 const BASE_URL = 'https://api.juejin.cn';
 
-/** Markdown 编辑模式(富文本为 0);不要用 TS enum,tsconfig 开了 erasableSyntaxOnly */
+/** Markdown edit mode (rich text is 0); no TS enum — tsconfig has erasableSyntaxOnly */
 const EDIT_TYPE_MARKDOWN = 10;
 
-/** 失败分类:网络层 / HTTP 非 2xx / 响应体异常 / 掘金业务错误 */
+/** Failure categories: network / HTTP non-2xx / malformed body / Juejin business error */
 export type JuejinErrorKind = 'network' | 'http' | 'body' | 'business';
 
-/** 一次掘金接口调用的结果 */
+/** Result of one Juejin API call */
 export interface JuejinResult<T> {
-  /** HTTP 2xx 且 err_no === 0;调用侧先判它(对标 ClaudeResult 的 exitCode === 0) */
+  /** HTTP 2xx and err_no === 0; callers check this first */
   ok: boolean;
-  /** ok 时的数据;失败为 null */
+  /** Data when ok; null on failure */
   data: T | null;
-  /** 0 成功;-1 网络/超时;-2 HTTP 非 2xx;-3 响应体异常;>0 掘金 err_no 原值 */
+  /** 0 success; -1 network/timeout; -2 HTTP non-2xx; -3 malformed body; >0 Juejin err_no */
   errNo: number;
-  /** 可直接展示给用户的描述 */
+  /** User-facing description */
   errMsg: string;
-  /** HTTP 状态码;网络失败为 null */
+  /** HTTP status; null on network failure */
   httpStatus: number | null;
-  /** ok 时为 null */
+  /** null when ok */
   kind: JuejinErrorKind | null;
-  /** 登录态失效:401/403,或响应是登录页/提示未登录 */
+  /** 401/403, or the response is a login page */
   authExpired: boolean;
-  /** 失败时截断的原始响应体(≤500 字),供 --debug 排查 */
+  /** Truncated raw body on failure (≤500 chars), for --debug */
   raw: string | null;
 }
 
-/** 掘金统一响应信封(线上的原始下划线字段) */
+/** Juejin's response envelope (raw underscore fields) */
 interface JuejinEnvelope<T> {
   err_no?: number;
   err_msg?: string;
   data?: T | null;
 }
 
-/** 调用选项 */
+/** Call options */
 export interface JuejinOptions {
-  /** 归一化后的 Cookie 串 */
+  /** Normalized cookie string */
   cookie: string;
-  /** 单次请求超时(毫秒)。fetch 无默认超时,必须显式设置,否则一个挂住的请求会卡死整批 */
+  /** Per-request timeout (ms); fetch has no default, so one hung request would stall the whole batch */
   timeoutMs: number;
 }
 
-/** 调用钩子 */
+/** Call hooks */
 export interface JuejinHooks {
-  /** 每次退避重试前回调 */
+  /** Called before each backoff retry */
   onRetry?: (info: { attempt: number; errMsg: string; waitMs: number }) => void;
-  /** --debug 时打印请求/响应摘要 */
+  /** Request/response summaries under --debug */
   onDebug?: (line: string) => void;
 }
 
-/** 建草稿的入参 */
+/** Input for creating a draft */
 export interface DraftInput {
   title: string;
-  /** 摘要,掘金要求 50~100 字 */
+  /** Brief; Juejin requires 50~100 chars */
   briefContent: string;
-  /** Markdown 正文(不含标题) */
+  /** Markdown body (title excluded) */
   markContent: string;
   categoryId: string;
   tagIds: string[];
-  /** 封面图 URL;空串表示不设封面 */
+  /** Cover image URL; empty string means no cover */
   coverImage: string;
 }
 
-/** 建草稿的响应(两种字段名都出现过,用 normalizeId 兼容) */
+/** Both field names have been observed; normalizeId handles both */
 interface DraftCreated {
   id?: string | number;
   draft_id?: string | number;
 }
 
-/** 发布文章的响应 */
 interface ArticlePublished {
   article_id?: string | number;
 }
 
-/** 掘金草稿列表里的单条草稿(只列我们关心的字段,其余原样保留在 raw) */
+/** One draft from the list endpoint (other fields kept as-is in raw) */
 export interface DraftBrief {
   draftId: string;
   title: string;
@@ -98,60 +93,59 @@ export interface DraftBrief {
 // ============ Cookie ============
 
 /**
- * 归一化用户粘贴的 Cookie。
- * 容错:可能粘成 `Cookie: sessionid=xxx`、带引号、带换行、或只粘了裸 sessionid 值。
- * 返回 null 表示无法识别。
+ * Normalize a pasted cookie; tolerates a `Cookie:` prefix, quotes, newlines, or a bare sessionid.
+ * Returns null if it cannot be recognized.
  */
 export function normalizeCookie(raw: string): string | null {
   let s = raw.trim();
   if (!s) return null;
 
-  // 去掉可能带上的 "Cookie:" 头名前缀
+  // Strip a "Cookie:" header-name prefix
   s = s.replace(/^cookie\s*:\s*/i, '');
-  // 去掉整体包裹的引号
+  // Strip quotes wrapping the whole string
   s = s.replace(/^["'`]|["'`]$/g, '');
-  // 换行/多余空白折成 "; "
+  // Collapse newlines/extra whitespace into "; "
   s = s.split(/[\r\n]+/).map((line) => line.trim()).filter(Boolean).join('; ');
   s = s.replace(/\s*;\s*/g, '; ').replace(/;\s*$/, '');
 
   if (!s) return null;
-  // 整串不含 "=" 说明只粘了裸值,补成 sessionid=<值>
+  // A bare value with no "=" becomes sessionid=<value>
   if (!s.includes('=')) s = `sessionid=${s}`;
-  // 最终必须含有 sessionid,否则掘金认不出来
+  // Must contain sessionid, otherwise Juejin will not recognize it
   if (!/(^|;\s*)sessionid=/.test(s)) return null;
   return s;
 }
 
 /**
- * 读取 Cookie:优先环境变量 JUEJIN_COOKIE,其次仓库根目录下 gitignored 的 .juejin-cookie 文件。
- * 返回归一化后的串,或 null(附带说明原因由调用侧打印)。
+ * Read the cookie from JUEJIN_COOKIE, else the gitignored .juejin-cookie file in the repo root.
+ * Returns the normalized string, or a reason the caller prints.
  */
 export function loadCookie(repoRoot: string): { cookie: string } | { error: string } {
   const fromEnv = process.env.JUEJIN_COOKIE?.trim();
   if (fromEnv) {
     const cookie = normalizeCookie(fromEnv);
-    return cookie ? { cookie } : { error: '环境变量 JUEJIN_COOKIE 里找不到 sessionid' };
+    return cookie ? { cookie } : { error: 'Could not find sessionid in the JUEJIN_COOKIE environment variable' };
   }
 
   const file = path.join(repoRoot, '.juejin-cookie');
   if (!existsSync(file)) {
     return {
       error:
-        `没有找到掘金 Cookie。请二选一:\n` +
-        `  · 设置环境变量 JUEJIN_COOKIE="sessionid=..."\n` +
-        `  · 或把 sessionid 写进 ${file}`,
+        `Juejin cookie not found. Choose one of the following:\n` +
+        `  · Set the environment variable JUEJIN_COOKIE="sessionid=..."\n` +
+        `  · Or write the sessionid into ${file}`,
     };
   }
   const cookie = normalizeCookie(readFileSync(file, 'utf8'));
-  return cookie ? { cookie } : { error: `${file} 里找不到 sessionid` };
+  return cookie ? { cookie } : { error: `Could not find sessionid in ${file}` };
 }
 
-// ============ 请求 ============
+// ============ Request ============
 
-/** HTTP 方法。实测 query_category_briefs 只认 GET,POST 会返回「请求路由不存在」 */
+/** query_category_briefs accepts only GET; POST returns "request route does not exist" */
 type HttpMethod = 'GET' | 'POST';
 
-/** 统一请求头;掘金对 UA / referer / origin 敏感,社区脚本常栽在这里 */
+/** Juejin is sensitive to UA / referer / origin */
 function buildHeaders(cookie: string, method: HttpMethod): Record<string, string> {
   const headers: Record<string, string> = {
     accept: 'application/json, text/plain, */*',
@@ -160,9 +154,9 @@ function buildHeaders(cookie: string, method: HttpMethod): Record<string, string
     origin: 'https://juejin.cn',
     referer: 'https://juejin.cn/',
   };
-  // 只读命令(--categories/--tags)无需登录态,此时不发空 Cookie 头
+  // Read-only commands need no auth; do not send an empty Cookie header
   if (cookie) headers.cookie = cookie;
-  // GET 没有 body,不带 content-type(实测该端点这样才通)
+  // GET has no body, so no content-type (this endpoint only works that way)
   if (method === 'POST') headers['content-type'] = 'application/json';
   return headers;
 }
@@ -185,7 +179,7 @@ function fail<T>(
   };
 }
 
-/** 仅网络层失败、408/429/5xx 值得自动重试 */
+/** Only network failures and 408/429/5xx are worth retrying */
 export function isTransient(res: JuejinResult<unknown>): boolean {
   if (res.ok) return false;
   if (res.kind === 'network') return true;
@@ -195,12 +189,16 @@ export function isTransient(res: JuejinResult<unknown>): boolean {
   return false;
 }
 
-/** 业务错误码/文案看起来像登录态失效 */
+/**
+ * Business error looks like an expired session. The API words these in Chinese; those branches are
+ * \u-escaped purely to keep this source file ASCII (they match "login", "not logged in",
+ * "invalid", "expired" in the API's own wording). Do not drop them.
+ */
 function looksLikeAuthError(errMsg: string): boolean {
-  return /登录|未登录|login|token|失效|过期/i.test(errMsg);
+  return /\u767b\u5f55|\u672a\u767b\u5f55|login|token|\u5931\u6548|\u8fc7\u671f/i.test(errMsg);
 }
 
-/** 单次请求,永不抛异常 */
+/** Single request; never throws */
 async function juejinOnce<T>(
   apiPath: string,
   body: unknown,
@@ -227,10 +225,11 @@ async function juejinOnce<T>(
         authExpired: res.status === 401 || res.status === 403,
       });
     }
-    // 被风控或未登录时,掘金常直接返回 HTML 页面而不是 JSON
+    // When rate-limited or logged out, Juejin returns an HTML page instead of JSON
     if (!(res.headers.get('content-type') ?? '').includes('json')) {
-      const authExpired = /登录|login/i.test(text);
-      return fail<T>(-3, 'body', authExpired ? 'Cookie 已失效(接口返回登录页)' : '接口返回的不是 JSON', {
+      // Chinese branch = the API's word for "login", \u-escaped to keep this file ASCII
+      const authExpired = /\u767b\u5f55|login/i.test(text);
+      return fail<T>(-3, 'body', authExpired ? 'Cookie has expired (the API returned a login page)' : 'The API did not return JSON', {
         httpStatus,
         raw: text.slice(0, 500),
         authExpired,
@@ -241,7 +240,7 @@ async function juejinOnce<T>(
     try {
       env = JSON.parse(text) as JuejinEnvelope<T>;
     } catch {
-      return fail<T>(-3, 'body', '响应体 JSON 解析失败', {
+      return fail<T>(-3, 'body', 'Failed to parse the response body JSON', {
         httpStatus,
         raw: text.slice(0, 500),
         authExpired: false,
@@ -251,7 +250,7 @@ async function juejinOnce<T>(
     const errNo = env.err_no ?? -3;
     if (errNo === 0) {
       if (env.data === undefined || env.data === null) {
-        return fail<T>(-3, 'body', 'err_no 为 0 但缺少 data', {
+        return fail<T>(-3, 'body', 'err_no is 0 but data is missing', {
           httpStatus,
           raw: text.slice(0, 500),
           authExpired: false,
@@ -260,7 +259,7 @@ async function juejinOnce<T>(
       return { ok: true, data: env.data, errNo: 0, errMsg: '', httpStatus, kind: null, authExpired: false, raw: null };
     }
 
-    const errMsg = env.err_msg?.trim() || `掘金返回 err_no=${errNo}`;
+    const errMsg = env.err_msg?.trim() || `Juejin returned err_no=${errNo}`;
     return fail<T>(errNo, 'business', errMsg, {
       httpStatus,
       raw: text.slice(0, 500),
@@ -270,17 +269,17 @@ async function juejinOnce<T>(
     const e = err as Error;
     const msg =
       e.name === 'TimeoutError'
-        ? `请求超时(${opts.timeoutMs}ms)`
+        ? `Request timed out (${opts.timeoutMs}ms)`
         : e.name === 'AbortError'
-          ? '请求被中断'
-          : `网络错误: ${e.message}`;
+          ? 'Request aborted'
+          : `Network error: ${e.message}`;
     return fail<T>(-1, 'network', msg, { httpStatus, raw: null, authExpired: false });
   }
 }
 
 /**
- * 带退避重试的外层。retries 由各端点自己定 ——
- * 因为「超时」对建草稿(可安全重试)和对发布(重试可能产生第二篇公开文章)意味着完全不同的处理。
+ * Backoff-retry wrapper; retries is per endpoint — a timeout is safely retryable for a draft
+ * but for publish may create a second public article.
  */
 async function juejinCall<T>(
   apiPath: string,
@@ -301,18 +300,16 @@ async function juejinCall<T>(
   return res as JuejinResult<T>;
 }
 
-/** 把 string | number 一律归一成字符串 id */
+/** Normalize string | number into a string id */
 function normalizeId(v: string | number | undefined): string | null {
   if (v === undefined || v === null) return null;
   const s = String(v).trim();
   return s ? s : null;
 }
 
-// ============ 端点 ============
+// ============ Endpoints ============
 
-/**
- * 建草稿。失败最多重试 3 次 —— 草稿不公开,超时重试最坏只多一个草稿(可恢复)。
- */
+/** Create a draft; retry 3 — drafts are not public, so a timeout at worst leaves one extra draft */
 export function createDraft(
   input: DraftInput,
   opts: JuejinOptions,
@@ -336,7 +333,7 @@ export function createDraft(
       }
       const draftId = normalizeId(res.data?.id ?? res.data?.draft_id);
       if (!draftId) {
-        return fail<{ draftId: string | null }>(-3, 'body', '建草稿成功但响应里没有草稿 id', {
+        return fail<{ draftId: string | null }>(-3, 'body', 'Draft created successfully but the response had no draft id', {
           httpStatus: res.httpStatus,
           raw: res.raw,
           authExpired: false,
@@ -348,8 +345,8 @@ export function createDraft(
 }
 
 /**
- * 发布草稿。**retries = 0** —— POST 超时/网络中断时「是否已发布」不可知,
- * 自动重试可能产生第二篇公开文章。这个歧义必须交给人判(见 publish.ts 的 publishAttemptedAt)。
+ * Publish a draft; retries = 0 — on a POST timeout, whether it published is unknowable,
+ * so a retry could create a second public article; the ambiguity is left to a human.
  */
 export function publishArticle(
   draftId: string,
@@ -367,18 +364,14 @@ export function publishArticle(
   );
 }
 
-/** 单个分类 */
 export interface JuejinCategory {
   categoryId: string;
   categoryName: string;
 }
 
 /**
- * 查询掘金全部分类。
- *
- * ⚠️ **必须用 GET** —— 实测 POST 同一路径返回 `err_no=2「请求路由不存在」`,
- * GET 才返回 8 个分类。这是本文件里最容易写错的一处。
- * 该端点不需要登录态,未带 Cookie 也能拿到数据。
+ * Query all categories. ⚠️ GET only — POST on the same path returns err_no=2 "request route does not exist";
+ * GET returns the 8 categories. Needs no auth (works with no cookie).
  */
 export function queryCategories(
   opts: JuejinOptions,
@@ -403,13 +396,12 @@ export function queryCategories(
   });
 }
 
-/** 单个标签 */
 export interface JuejinTag {
   tagId: string;
   tagName: string;
 }
 
-/** 实测返回项:{ tag_id, tag: { tag_id, tag_name, ... } } —— 名字在嵌套的 tag 里,不在顶层 */
+/** { tag_id, tag: { tag_id, tag_name } } — the name is nested, not top-level */
 interface TagListEntry {
   tag_id?: string | number;
   tag_name?: string;
@@ -417,9 +409,8 @@ interface TagListEntry {
 }
 
 /**
- * 按关键词查标签。该端点不需要登录态。
- *
- * ⚠️ `tag_name` 在嵌套的 `tag` 对象里(顶层只有 `tag_id`),两层都读一遍以防接口改版。
+ * Look up tags by keyword; no auth needed.
+ * ⚠️ `tag_name` lives in the nested `tag` object (top level has only `tag_id`); both are read in case the API changes.
  */
 export function queryTags(
   keyword: string,
@@ -446,11 +437,9 @@ export function queryTags(
 }
 
 /**
- * 列出当前账号的草稿(实测 `data` 是数组)。用于 `--orphans` 列遗留草稿。
- *
- * ⚠️ **不要用它读正文或封面** —— 该端点会把 `mark_content` / `html_content`
- * 返回成空字符串(省带宽),据此判断会得到「草稿没内容」的假警报。
- * 要读真实值请用 `getDraft`。
+ * List the account's drafts; used by `--orphans`.
+ * ⚠️ Do not read body/cover here — this endpoint blanks `mark_content`/`html_content` (bandwidth);
+ * use `getDraft` for real values.
  */
 export function listDrafts(
   opts: JuejinOptions,
@@ -461,7 +450,7 @@ export function listDrafts(
     (res) => {
       if (!res.ok) return res as unknown as JuejinResult<DraftBrief[]>;
       const raw = res.data;
-      // 兼容 data 直接是数组、或 {drafts: [...]} / {list: [...]} 两种包裹
+      // data may be an array directly or wrapped as {drafts: [...]} / {list: [...]}
       const arr: unknown[] = Array.isArray(raw)
         ? raw
         : ((raw as { drafts?: unknown[]; list?: unknown[] } | null)?.drafts ??
@@ -483,27 +472,18 @@ export function listDrafts(
   );
 }
 
-/** 已发布文章的一行(只有 id 和标题) */
+/** A published article row (id and title only) */
 export interface ArticleBrief {
   articleId: string;
   title: string;
 }
 
 /**
- * 列出当前账号**已发布文章**的 id 与标题。
- *
- * ⚠️ 与草稿列表不同,这里的 `data` **直接是数组**(不是 `data.data`)——
- * 写成 `res.data.data` 会拿到 undefined,看起来像「一篇都没有」。
- *
- * ⚠️ 标题在**嵌套的 `article_info.title`** 里,顶层没有 `title` 字段;
- * 顶层只有 `article_id`、`article_info`、`author_user_info` 等。
- *
- * 用途:`--rename` 用它读**线上文章记录**的标题。不能只看本地状态 ——
- * 掘金把草稿的标题同步到文章记录是异步的,有时要重发一次才生效,
- * 光信本地状态会把「草稿改了但线上没变」当成已完成而跳过。
- *
- * 单页 50 条足够(整个账号的文章数远小于 50);超出时返回的列表不含目标 id,
- * 调用方应退化为「未知」而不是「不匹配」。
+ * List published articles.
+ * ⚠️ `data` is the array directly (not `data.data`); the title is nested in `article_info.title`.
+ * Title sync from draft to article record is async (sometimes needs a re-send), so `--rename`
+ * must read live records, not local state; when the target id is absent, treat it as unknown, not mismatched.
+ * One page of 50 suffices (accounts have far fewer).
  */
 export function listArticles(
   opts: JuejinOptions,
@@ -532,7 +512,7 @@ export function listArticles(
   );
 }
 
-/** 草稿详情(只有这里能读到正文与封面的真实值,见 getDraft 的注释) */
+/** Draft detail; the only place with real body/cover values (see getDraft) */
 export interface DraftDetail {
   draftId: string;
   title: string;
@@ -542,7 +522,7 @@ export interface DraftDetail {
   editType: number;
 }
 
-/** 详情响应:数据在 data.article_draft 里,不在 data 顶层 */
+/** Detail data lives in data.article_draft, not data top-level */
 interface DraftDetailEnvelope {
   draft_id?: string;
   article_draft?: {
@@ -556,15 +536,9 @@ interface DraftDetailEnvelope {
 }
 
 /**
- * 读单篇草稿详情。
- *
- * ⚠️ 两个实测要点,都是踩过的坑:
- *
- * 1. **数据在 `data.article_draft`,不在 `data` 顶层** —— 读错层级会拿到一堆
- *    undefined,看起来就像「草稿是空的」。
- * 2. **列表接口 `list_by_user` 会把 `mark_content` / `html_content` 抹成空字符串**
- *    (省带宽)。所以**校验正文、读封面都必须走这里** —— 用列表接口判断正文是否
- *    送达会得到「空正文」的假警报。
+ * Read one draft's detail.
+ * ⚠️ Data is in `data.article_draft`, not `data` — wrong level looks like an empty draft.
+ * ⚠️ Validate body/cover here, never via list_by_user, which blanks `mark_content`/`html_content`.
  */
 export function getDraft(
   draftId: string,
@@ -581,7 +555,7 @@ export function getDraft(
     if (!res.ok) return res as unknown as JuejinResult<DraftDetail>;
     const d = res.data?.article_draft;
     if (!d) {
-      return fail<DraftDetail>(-3, 'body', '草稿详情里没有 article_draft 字段', {
+      return fail<DraftDetail>(-3, 'body', 'The draft detail has no article_draft field', {
         httpStatus: res.httpStatus,
         raw: res.raw,
         authExpired: false,
@@ -601,7 +575,7 @@ export function getDraft(
   });
 }
 
-/** 改草稿的入参 */
+/** Input for updating a draft */
 export interface DraftUpdateInput {
   draftId: string;
   title: string;
@@ -613,17 +587,10 @@ export interface DraftUpdateInput {
 }
 
 /**
- * 改一篇草稿(标题/正文/摘要/分类/标签/封面)。
- *
- * ⚠️ **键名是 `id`,不是 `draft_id`** —— 用 `draft_id` 会得到 `err_no=2「参数错误」`,
- * 而错误信息完全不提是哪个字段的问题。这是实测踩出来的。
- *
- * 用途:改**已发布**文章的标题。掘金的模型里已发布文章仍挂着一份草稿
- * (detail 里的 `article_id` 非 0),所以「编辑已发布文章」= 改草稿 + 重新 publish。
- * 实测 `publish` 会**就地更新**同一篇(article_id 不变),不会新建。
- *
- * ⚠️ 调用方务必把**所有字段都带上** —— 只传 title 有可能把正文/摘要清空。
- * 这也是本函数要求完整入参、而不提供「只改标题」便捷签名的原因。
+ * Update a draft (title/body/brief/category/tags/cover).
+ * ⚠️ Key is `id`, not `draft_id` — the latter gives err_no=2 "parameter error" with no field named.
+ * `publish` updates the same article in place (article_id unchanged); editing a published article = update draft + publish.
+ * ⚠️ Pass every field — sending only title can wipe body/brief.
  */
 export function updateDraft(
   input: DraftUpdateInput,

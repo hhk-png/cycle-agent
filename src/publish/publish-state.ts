@@ -2,68 +2,54 @@ import { closeSync, existsSync, openSync, readFileSync, renameSync, unlinkSync, 
 import path from 'node:path';
 
 /**
- * 发布状态的持久化。
+ * Persistence of publish state.
  *
- * ⚠️ 有两条不可退让的规则,改动前请先读:
- *
- * 1. **状态文件损坏必须硬停,绝不能当成空状态。**
- *    把损坏文件当空 = 14 篇已经发出去的文章会被重发一遍(公开且不可逆)。
- *    所以 loadState 解析失败时返回 error,且**不接受 --force 绕过**。
- *
- * 2. **每完成一步就落盘,不在信号处理器里写盘。**
- *    建草稿拿到 draftId 后立刻保存,再去发布 —— 这样即使发布失败或 Ctrl-C,
- *    孤儿草稿的 id 也不会丢。SIGINT 里写文件会有写盘竞态,一律不做。
- *    不变量:任何时刻中断,最多损失一篇的进度,最坏留下一个孤儿草稿(草稿不公开)。
+ * ⚠️ Two non-negotiable rules:
+ * 1. A corrupt state file must hard-stop, never be treated as empty —— otherwise the 14 already-published
+ *    articles get republished (public, irreversible). loadState errors on parse failure and --force does
+ *    not bypass it.
+ * 2. Flush after every step, never inside a signal handler —— save the draftId before publishing so a
+ *    failed publish or Ctrl-C doesn't lose an orphan draft. At most one article's progress is lost.
  */
 
 export const STATE_VERSION = 1;
 
-/** 单篇的发布状态 */
+/** Publish state of a single article */
 export interface ArticleState {
-  /** pending=未建草稿;drafted=草稿已建待发布;published=已发布 */
+  /** pending = draft not created; drafted = draft created awaiting publish; published = published */
   status: 'pending' | 'drafted' | 'published';
   draftId: string | null;
   articleId: string | null;
   url: string | null;
-  /** 建草稿/发布时正文的 sha256,用于发现「草稿建好后正文又被改过」 */
+  /** sha256 of the body at draft-creation/publish time, to detect later body edits */
   contentHash: string;
-  /**
-   * 最近一次成功发布时用的标题。
-   * `--sync` 靠它判断「这篇已经改成目标标题了」,从而跳过重复的改+发;
-   * 老状态文件里没有这个字段(undefined),不影响读取,只是第一次 sync 会多走一轮。
-   */
+  /** Title used at the last successful publish; `--sync` skips the change+publish when it already matches the target. */
   title?: string;
   /**
-   * 最近一次建草稿/同步时写进去的**摘要**。
-   *
-   * 为什么需要它:摘要不在 `contentHash` 覆盖的范围内(那个哈希只算标题+正文),
-   * 所以光看哈希发现不了「配置里的摘要改了、草稿里还是旧的」。
-   * 有了这一项,`--sync` 不读远端就能判断摘要是否漂移。
-   *
-   * 老状态文件没有这个字段 → undefined ≠ 任何摘要 → 第一次 `--sync` 会全量刷一遍,
-   * 之后各归各位。这正是想要的行为。
+   * The brief written at the last draft-creation/sync. Not covered by `contentHash` (title+body only), so
+   * `--sync` needs it to detect brief drift without reading the remote. Old files lack it → undefined ≠
+   * any brief → the first sync refreshes everything, which is the desired behavior.
    */
   brief?: string;
-  /** 发布请求已发出但结果未知的时刻(=超时/网络中断);此时禁止自动重发 */
+  /** When a publish request was sent but the result is unknown (timeout/interruption); automatic re-publishing is forbidden then */
   publishAttemptedAt: string | null;
-  /** 已发布但没拿到 article_id,需人工回后台确认 */
+  /** Published but no article_id obtained; needs manual confirmation in the backend */
   needsCheck: boolean;
   updatedAt: string;
 }
 
-/** 整个发布流程的状态 */
+/** State of the whole publish pipeline */
 export interface PublishState {
   version: number;
-  /** 从草稿读回的人工设置的封面 URL,14 篇复用;空串表示还没有 */
+  /** Cover URL read back from the draft, reused across articles; empty string means not set yet */
   coverImage: string;
-  /** key = 两位编号,如 '09' */
+  /** key = two-digit number, e.g. '09' */
   articles: Record<string, ArticleState>;
 }
 
 /**
- * 状态文件名(带配置名,避免以后发别的教程时串台)。
- * `namespace` 区分平台 —— 微信侧传 `'wechat-publish-state'`,
- * 两边的状态互不覆盖(同一篇教程在两个平台上的进度是独立的)。
+ * State file name, namespaced by config and platform so publishing other tutorials or platforms never
+ * cross-wires (WeChat passes `'wechat-publish-state'`).
  */
 export function stateFileName(
   repoRoot: string,
@@ -73,12 +59,12 @@ export function stateFileName(
   return path.join(repoRoot, `.${namespace}.${configName}.json`);
 }
 
-/** 全新的空状态 */
+/** A brand-new empty state */
 export function newState(): PublishState {
   return { version: STATE_VERSION, coverImage: '', articles: {} };
 }
 
-/** 取某篇的状态,不存在则创建 */
+/** Get an article's state, creating it if it doesn't exist */
 export function ensureArticle(state: PublishState, no: string, contentHash: string): ArticleState {
   const existing = state.articles[no];
   if (existing) return existing;
@@ -97,8 +83,8 @@ export function ensureArticle(state: PublishState, no: string, contentHash: stri
 }
 
 /**
- * 读取状态。
- * 文件不存在 → 全新空状态;**内容损坏或版本不符 → 返回 error**(见文件头规则 1)。
+ * Reads the state. Missing file → fresh empty state; corrupt content or version mismatch → error
+ * (file-header rule 1).
  */
 export function loadState(file: string): { state: PublishState } | { error: string } {
   if (!existsSync(file)) return { state: newState() };
@@ -107,7 +93,7 @@ export function loadState(file: string): { state: PublishState } | { error: stri
   try {
     text = readFileSync(file, 'utf8');
   } catch (err) {
-    return { error: `读取状态文件失败: ${(err as Error).message}` };
+    return { error: `Failed to read state file: ${(err as Error).message}` };
   }
   if (!text.trim()) return { state: newState() };
 
@@ -117,28 +103,28 @@ export function loadState(file: string): { state: PublishState } | { error: stri
   } catch (err) {
     return {
       error:
-        `状态文件已损坏,无法解析: ${file}\n` +
+        `State file is corrupt and cannot be parsed: ${file}\n` +
         `  ${(err as Error).message}\n` +
-        `  请修复它,或把它移走再重跑。**不要直接删除** —— 里面记着哪些文章已经发布过,\n` +
-        `  删了会导致已发布的文章被重发。`,
+        `  Please repair it, or move it away and rerun. **Do not just delete it** —— it records which articles have already been published,\n` +
+        `  and deleting it will cause already-published articles to be republished.`,
     };
   }
 
   if (parsed.version !== STATE_VERSION) {
     return {
       error:
-        `状态文件版本不符(文件 ${parsed.version},当前 ${STATE_VERSION}): ${file}\n` +
-        `  请手动迁移或移走该文件后再重跑。`,
+        `State file version mismatch (file ${parsed.version}, current ${STATE_VERSION}): ${file}\n` +
+        `  Please migrate it by hand or move the file away before rerunning.`,
     };
   }
   if (!parsed.articles || typeof parsed.articles !== 'object') {
-    return { error: `状态文件缺少 articles 字段,可能已损坏: ${file}` };
+    return { error: `State file is missing the articles field and may be corrupt: ${file}` };
   }
   if (typeof parsed.coverImage !== 'string') parsed.coverImage = '';
   return { state: parsed };
 }
 
-/** 原子写:先写 .tmp 再 rename,避免中断留下半截 JSON */
+/** Atomic write: .tmp then rename, so an interruption doesn't leave half a JSON file */
 export function saveState(file: string, state: PublishState): { ok: true } | { error: string } {
   const tmp = `${file}.tmp`;
   try {
@@ -146,16 +132,13 @@ export function saveState(file: string, state: PublishState): { ok: true } | { e
     renameSync(tmp, file);
     return { ok: true };
   } catch (err) {
-    return { error: `写入状态文件失败: ${(err as Error).message}` };
+    return { error: `Failed to write state file: ${(err as Error).message}` };
   }
 }
 
-// ============ 并发锁 ============
+// ============ Concurrency lock ============
 
-/**
- * 取进程锁,防止两个终端同时跑导致状态互相覆盖。
- * 陈旧锁(持有进程已不存在)会被自动接管。
- */
+/** Process lock so two terminals can't overwrite each other's state; stale locks are taken over. */
 export function acquireLock(file: string): { ok: true } | { error: string } {
   const lockFile = `${file}.lock`;
   const payload = JSON.stringify({ pid: process.pid, at: new Date().toISOString() });
@@ -167,37 +150,37 @@ export function acquireLock(file: string): { ok: true } | { error: string } {
       return { ok: true };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
-        return { error: `创建锁文件失败: ${(err as Error).message}` };
+        return { error: `Failed to create lock file: ${(err as Error).message}` };
       }
-      // 锁已存在:看持有者还活着吗
+      // Lock already exists: check whether the holder is still alive
       let pid = 0;
       try {
         pid = Number(JSON.parse(readFileSync(lockFile, 'utf8')).pid) || 0;
       } catch {
-        pid = 0; // 锁文件本身坏了,当陈旧锁处理
+        pid = 0; // The lock file itself is broken; treat it as a stale lock
       }
       if (pid > 0 && isAlive(pid)) {
         return {
-          error: `另一次发布正在进行中(pid ${pid})。\n  若确认没有其它进程在跑,请删除 ${lockFile} 后重试。`,
+          error: `Another publish is already in progress (pid ${pid}).\n  If you are sure no other process is running, delete ${lockFile} and retry.`,
         };
       }
-      // 陈旧锁:清掉后接管
+      // Stale lock: clear it and take over
       try {
         unlinkSync(lockFile);
       } catch {
-        /* 竞争失败就再试一轮,下一轮会报错 */
+        /* On a lost race, try another round; the next round will report an error */
       }
     }
   }
-  return { error: `无法获得锁: ${lockFile}` };
+  return { error: `Could not acquire lock: ${lockFile}` };
 }
 
-/** 释放锁(尽力而为,失败不影响主流程) */
+/** Release the lock (best effort) */
 export function releaseLock(file: string): void {
   try {
     unlinkSync(`${file}.lock`);
   } catch {
-    /* 忽略 */
+    /* ignore */
   }
 }
 
@@ -206,7 +189,7 @@ function isAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    // EPERM 说明进程存在但没权限发信号,仍算活着
+    // EPERM means the process exists but we lack permission to signal it; still counts as alive
     return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }

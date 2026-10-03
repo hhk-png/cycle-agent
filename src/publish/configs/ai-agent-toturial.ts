@@ -1,16 +1,13 @@
 import type { PublishConfig } from '../publish-config.ts';
 
 /**
- * AI Agent 教程(00~22 章)的掘金发布配置。
+ * Juejin publish config for the AI Agent tutorial (chapters 00~22).
  *
- * ⚠️ 这个教程的源文件名**没有系列前缀**(`00-前言与导读.md`),所以:
- *   · filePrefix 留空 —— 扫描时退化成 `^<编号>-<标题>.md$`
- *   · titlePrefix 补 `'ai-agent教程-'`,标题才是 `ai-agent教程-00-前言与导读`,
- *     与已发的 `vllm教程-XX`、`ray教程-XX` 排成同一套命名。
- * 不改文件名是因为 README 里 23 条章节链接按文件名写死,改名会全部失效。
+ * Source file names carry no series prefix, so filePrefix is empty and titlePrefix adds one;
+ * the names can't change because the README's 23 chapter links are hard-coded to them.
  *
- * 摘要必须 50~100 字、单行纯文本,目标区间 60~90。
- * 用 `node src/publish/publish.ts juejin ai-agent-toturial --list` 一次看全部 23 条的字数与校验结果。
+ * Digests: 50~100 chars, single line, ideally 60~90 (see all counts with
+ * `node src/publish/publish.ts juejin ai-agent-toturial --list`).
  */
 const config: PublishConfig = {
   sourceDir: 'ai-agent-toturial',
@@ -20,17 +17,16 @@ const config: PublishConfig = {
   titleSource: 'fileName',
   titlePrefix: 'ai-agent教程-',
 
-  // 以下 id 由 `node src/publish/publish.ts juejin <配置名> --categories` / `--tags <词>` 实测得到
-  categoryId: '6809637773935378440', // 分类:人工智能
-  // ⚠️ 最多 3 个(掘金服务端硬限制,err_no=4031),多给会直接建草稿失败
+  // ids below measured with `publish.ts juejin <name> --categories` / `--tags <word>`
+  categoryId: '6809637773935378440', // category: artificial intelligence
+  // ⚠️ max 3 (Juejin server limit, err_no=4031)
   tagIds: [
-    '6809640642101116936', // 人工智能
+    '6809640642101116936', // artificial intelligence
     '7516396389476401162', // Agent
     '7257794499869573175', // LLM
   ],
 
-  // 封面:留空表示不预设。首篇草稿建好后在编辑器里手动设置封面,
-  // 脚本会从草稿把 cover_image URL 读回来,复用到其余各篇。
+  // Cover: empty = not preset; set it on the first draft and the rest reuse its URL.
   coverImage: '',
 
   delayMs: 5000,

@@ -2,14 +2,12 @@ import type { WechatConfig } from '../wechat-config.ts';
 import juejin from './ray-toturial.ts';
 
 /**
- * Ray 教程(00~39 章)的微信公众号发布配置。
+ * WeChat Official Account publish config for the Ray tutorial (chapters 00~39).
  *
- * 源文件名自带 `ray教程-` 前缀,所以不需要 titlePrefix —— 标题就是
- * `ray教程-00-前言与导读`。
+ * Source file names already carry `ray-tutorial-`, so no titlePrefix is needed.
+ * Digests reuse the Juejin config (WeChat 120 > Juejin 100, both compliant).
  *
- * 摘要直接复用掘金那份(微信 digest 上限 120 字 > 掘金 100 字,都合规)。
- *
- * ⚠️ 微信标题上限 **32 字**:26/27/29 三篇超限,下面缩到 32 以内。
+ * ⚠️ WeChat titles max 32 chars: 26/27/29 exceed it and are shortened below.
  */
 const config: WechatConfig = {
   sourceDir: 'ray-toturial',
@@ -25,13 +23,12 @@ const config: WechatConfig = {
 
   coverImage: 'assets/wechat-cover.jpg',
 
-  // 接在 AI Agent 系列(2026-10-05 起 23 期)之后,2026-11-01 开排。
-  // 草稿本身不依赖这个日期,它只影响 --plan 的排期表
+  // follows the AI Agent series (23 issues from 2026-10-05); date only affects --plan
   startDate: '2026-11-01',
 
   contentSourceUrl: '',
 
-  // 微信标题上限 32 字,这三篇按原文件名会超限
+  // ⚠️ titles max 32 chars; these three exceed that with their original names
   titleOverrides: {
     '26': 'ray教程-26-RayCompiledGraph与DAG',
     '27': 'ray教程-27-附录F-RayClient与多语言',

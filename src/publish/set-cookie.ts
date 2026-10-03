@@ -7,28 +7,24 @@ import { listDrafts, normalizeCookie } from './api/juejin.ts';
 import { dim, error, header, info, success } from '../shared/ui.ts';
 
 /**
- * 交互式写入掘金 sessionid 到 .juejin-cookie。
+ * Interactively writes the Juejin sessionid to .juejin-cookie.
  *
- * 用法:
- *   node src/publish/set-cookie.ts            # 交互式粘贴(输入不回显)
- *   node src/publish/set-cookie.ts <cookie>   # 直接给值(⚠️ 会进 shell 历史,不推荐)
+ * Usage:
+ *   node src/publish/set-cookie.ts            # interactive paste (input not echoed)
+ *   node src/publish/set-cookie.ts <cookie>   # value as an argument (⚠️ stays in shell history)
  *
- * 两条刻意的设计:
- *
- * 1. **输入不回显** —— 凭据不该留在终端回滚缓冲里。把 readline 的 output 指向
- *    丢弃流即可,不用引入任何依赖。同理,本文件从头到尾只打印掩码形式,
- *    绝不回显 sessionid 原文(即使在出错路径上)。
- *
- * 2. **写完立刻用只读接口验证** —— `/content_api/v1/article_draft/list_by_user`
- *    实测未登录时返回 `err_no=403「must login」`,带登录态才通。所以它能当
- *    「Cookie 到底有没有登录态」的试纸,且**零副作用**(只读,不建不改任何东西)。
- *    把失效的 Cookie 拦在这里,而不是等发到第 1 篇草稿才发现。
+ * Two deliberate choices:
+ * 1. **Input is never echoed** — credentials should not stay in the terminal scrollback,
+ *    so readline writes to a discarded stream. Only masked forms are printed anywhere.
+ * 2. **Verify right after writing with a read-only endpoint** — `list_by_user` returns
+ *    403 "must login" when unauthenticated, so it is a zero-side-effect test for whether
+ *    the cookie has a login session; a dead cookie is caught here, not at draft #1.
  */
 
 const REPO_ROOT = process.cwd();
 const VERIFY_TIMEOUT_MS = 15000;
 
-/** 把 Cookie 串渲染成可安全展示的摘要:sessionid 只留头尾,其余只留键名 */
+/** Render a cookie string as a safe summary: sessionid head/tail only, other keys only */
 function maskCookie(cookie: string): string {
   const parts = cookie.split(';').map((p) => p.trim()).filter(Boolean);
   const shown: string[] = [];
@@ -39,20 +35,20 @@ function maskCookie(cookie: string): string {
     const key = eq >= 0 ? part.slice(0, eq) : part;
     const val = eq >= 0 ? part.slice(eq + 1) : '';
     if (key === 'sessionid') {
-      // 太短就完全不打码内容,只报长度 —— 免得把有效信息拼出来
+      // Too short to mask meaningfully; report only the length
       const head = val.length >= 12 ? `${val.slice(0, 4)}…${val.slice(-4)}` : '…';
-      shown.push(`${key}=${head}(${val.length} 字符)`);
+      shown.push(`${key}=${head}(${val.length} chars)`);
     } else {
       others.push(key);
     }
   }
-  if (others.length > 0) shown.push(`另含 ${others.length} 个 cookie:${others.join(', ')}`);
+  if (others.length > 0) shown.push(`plus ${others.length} other cookies: ${others.join(', ')}`);
   return shown.join(' · ');
 }
 
-/** 读取一行输入,终端下不回显 */
+/** Read one line; no echo on a terminal */
 async function readHidden(question: string): Promise<string> {
-  // 管道输入(echo xxx | node src/publish/set-cookie.ts):本来就没有回显问题
+  // Piped input (echo xxx | node src/publish/set-cookie.ts): no echo concern anyway
   if (!process.stdin.isTTY) {
     process.stdin.setEncoding('utf8');
     let buf = '';
@@ -60,7 +56,7 @@ async function readHidden(question: string): Promise<string> {
     return (buf.split(/\r?\n/)[0] ?? '').trim();
   }
 
-  // 终端输入:output 指向丢弃流,readline 的回显就没了
+  // Terminal input: point readline's output at a discarded stream to suppress echo
   const muted = new Writable({
     write(_chunk, _enc, cb) {
       cb();
@@ -75,22 +71,22 @@ async function readHidden(question: string): Promise<string> {
   }
 }
 
-/** 打印从哪里取的说明 —— sessionid 是 HttpOnly,这是上一轮踩过的坑 */
+/** Explain where to get it — sessionid is HttpOnly, a past gotcha */
 function printHowTo(): void {
-  info('需要掘金登录态里的 sessionid。取法:');
-  info('  浏览器登录掘金 → F12 → Application(应用)→ Cookies → https://juejin.cn');
-  info('  找到 sessionid 那一行,复制它的 Value 粘过来');
+  info('Need the sessionid from your Juejin login. How to get it:');
+  info('  Log in to Juejin in the browser → F12 → Application → Cookies → https://juejin.cn');
+  info('  Find the sessionid row and paste its Value here');
   info('');
-  info('  ⚠️ sessionid 是 HttpOnly cookie,在 Console 里敲 document.cookie 是看不到它的。');
-  info('     必须走 Application 面板,或用 Network 面板里任意 api.juejin.cn 请求的');
-  info('     「请求头 → cookie:」那一整行。');
+  info('  ⚠️ sessionid is an HttpOnly cookie; typing document.cookie in the Console will not show it.');
+  info('     Use the Application panel, or any request to api.juejin.cn in the Network panel:');
+  info('     copy the whole "Request Headers → cookie:" line.');
   info('');
 }
 
 async function main(): Promise<number> {
-  header('设置掘金 Cookie');
+  header('Set Juejin Cookie');
 
-  // 先确认文件被 gitignore 覆盖 —— 凭据必须先保证不会进仓库,再谈写入
+  // Confirm the file is gitignored before writing: the credential must not be committable
   const ignoreProblem = assertCookieIgnored(REPO_ROOT);
   if (ignoreProblem) {
     error(ignoreProblem);
@@ -100,29 +96,29 @@ async function main(): Promise<number> {
   const fromArgv = process.argv.slice(2).find((a) => !a.startsWith('--'));
   let raw = fromArgv ?? '';
   if (fromArgv) {
-    dim('  提示:用命令行参数传凭据会留在 shell 历史里,下次可以不带参数、改用交互粘贴。');
+    dim('  Hint: passing the credential as an argument leaves it in shell history; next time omit it and paste interactively.');
   } else {
     printHowTo();
-    raw = await readHidden('粘贴 sessionid(输入不回显;直接回车取消): ');
+    raw = await readHidden('Paste sessionid (input hidden; press Enter to cancel): ');
     if (!raw) {
-      info('已取消,没有写入任何东西。');
+      info('Cancelled; nothing was written.');
       return 1;
     }
   }
 
   const cookie = normalizeCookie(raw);
   if (!cookie) {
-    error('没能从输入里认出 sessionid。');
+    error('Could not recognize a sessionid in the input.');
     if (raw.trim()) {
-      error('  sessionid=xxx、整行 cookie、或只粘裸值都能识别 —— 但输入里确实没有 sessionid。');
-      error('  只有 _tea_utm_cache / __tea_cookie_tokens / s_v_web_id 这类匿名 cookie 是无法登录的。');
+      error('  sessionid=xxx, a full cookie line, or a bare value are all accepted — but the input really has no sessionid.');
+      error('  Anonymous cookies like _tea_utm_cache / __tea_cookie_tokens / s_v_web_id cannot log in.');
     }
     return 1;
   }
 
   const sid = /(?:^|;\s*)sessionid=([^;]*)/.exec(cookie)?.[1] ?? '';
   if (sid.length < 16) {
-    error(`sessionid 的值不完整(只有 ${sid.length} 字符),请重新复制完整值。`);
+    error(`sessionid value is incomplete (only ${sid.length} chars); copy the full value again.`);
     return 1;
   }
 
@@ -132,32 +128,32 @@ async function main(): Promise<number> {
     writeFileSync(tmp, `${cookie}\n`, { encoding: 'utf8', mode: 0o600 });
     renameSync(tmp, file);
   } catch (err) {
-    error(`写入 ${file} 失败: ${(err as Error).message}`);
+    error(`Failed to write ${file}: ${(err as Error).message}`);
     return 1;
   }
 
-  success(`已写入 ${path.relative(REPO_ROOT, file)}(已被 .gitignore 忽略)`);
+  success(`Wrote ${path.relative(REPO_ROOT, file)} (ignored by .gitignore)`);
   dim(`  ${maskCookie(cookie)}`);
-  dim('  环境变量 JUEJIN_COOKIE 优先级更高,若你设过它会覆盖这个文件。');
+  dim('  The JUEJIN_COOKIE env var takes precedence and overrides this file if set.');
   info('');
 
-  // 用「必须登录」的只读接口验一下,把失效的 Cookie 拦在这里
-  info('正在验证登录态…');
+  // Verify with the login-required read-only endpoint; catch a dead cookie here
+  info('Verifying login…');
   const res = await listDrafts({ cookie, timeoutMs: VERIFY_TIMEOUT_MS });
   if (res.ok) {
-    success(`Cookie 有效 —— 掘金认得这个登录态(当前草稿箱 ${(res.data ?? []).length} 篇)`);
-    info('接下来: node src/publish/publish.ts juejin --list   然后   node src/publish/publish.ts juejin');
+    success(`Cookie is valid — Juejin accepts this login (draft box currently has ${(res.data ?? []).length})`);
+    info('Next: node src/publish/publish.ts juejin --list   then   node src/publish/publish.ts juejin');
     return 0;
   }
   if (res.authExpired) {
-    error(`掘金没有认可这个登录态:${res.errMsg}`);
-    error('  请确认复制的是「已登录」状态下、且属于 api.juejin.cn 的 sessionid。');
-    error('  若浏览器里本来就没登录掘金,先去登录再取一次。');
+    error(`Juejin did not accept this login: ${res.errMsg}`);
+    error('  Make sure you copied a sessionid from a logged-in state belonging to api.juejin.cn.');
+    error('  If the browser was not logged in to Juejin, log in first and fetch it again.');
     return 1;
   }
-  // 非登录问题(网络、接口变动…)不该拦着用户,文件已经写好了
-  info(`文件已保存,但连通性没验证成:${res.errMsg}`);
-  dim('  这不一定是 Cookie 的问题,直接跑 node src/publish/publish.ts juejin --list 看看即可。');
+  // A non-auth problem (network, API change, ...) should not block the user; the file is already written
+  info(`File saved, but connectivity could not be verified: ${res.errMsg}`);
+  dim('  This is not necessarily a cookie problem; just run node src/publish/publish.ts juejin --list to check.');
   return 0;
 }
 

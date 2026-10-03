@@ -1,14 +1,13 @@
 import type { PublishConfig } from '../publish-config.ts';
 
 /**
- * Ray 教程(00~39 章)的掘金发布配置。
+ * Juejin publish config for the Ray tutorial (chapters 00~39).
  *
- * 源文件名自带系列前缀(`ray教程-00-前言与导读.md`),所以 filePrefix 用
- * `'ray教程'` 扫描、**不需要** titlePrefix —— 标题直接就是 `ray教程-00-前言与导读`,
- * 与已发的 `vllm教程-XX` 命名一致。
+ * Source file names already carry the series prefix (`ray-tutorial-`), so filePrefix scans with it
+ * and titlePrefix is not needed.
  *
- * 摘要必须 50~100 字、单行纯文本,目标区间 60~90。
- * 用 `node src/publish/publish.ts juejin ray-toturial --list` 一次看全部 40 条的字数与校验结果。
+ * Digests: 50~100 chars, single line, ideally 60~90 (see all counts with
+ * `node src/publish/publish.ts juejin ray-toturial --list`).
  */
 const config: PublishConfig = {
   sourceDir: 'ray-toturial',
@@ -17,13 +16,13 @@ const config: PublishConfig = {
 
   titleSource: 'fileName',
 
-  // 分类「人工智能」与标签「人工智能」是两个不同的 id,别混用
-  categoryId: '6809637773935378440', // 分类:人工智能
-  // ⚠️ 最多 3 个(掘金服务端硬限制,err_no=4031),多给会直接建草稿失败
+  // category "artificial intelligence" and tag "artificial intelligence" are different ids
+  categoryId: '6809637773935378440', // category: artificial intelligence
+  // ⚠️ max 3 (Juejin server limit, err_no=4031)
   tagIds: [
-    '6809640642101116936', // 人工智能
-    '6809641135154135054', // 分布式
-    '6809640525595934734', // 机器学习
+    '6809640642101116936', // artificial intelligence
+    '6809641135154135054', // distributed
+    '6809640525595934734', // machine learning
   ],
 
   coverImage: '',

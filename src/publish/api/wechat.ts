@@ -2,23 +2,14 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * 微信公众号接口的唯一网络层。
+ * The only network layer for the WeChat Official Accounts API.
  *
- * 与 juejin.ts 同一套骨架(Result 对象不抛异常、按端点给不同重试次数、
- * `AbortSignal.timeout`、onDebug 钩子),但不复用它 —— 那边的信封是掘金的
- * `err_no`/`err_msg`(错误时 HTTP 未必非 200),微信是 HTTP 200 + `errcode`/`errmsg`,
- * 两套错误模型硬凑在一起只会互相污染。
+ * Same skeleton as juejin.ts (never-throwing Result, per-endpoint retries, AbortSignal.timeout, onDebug)
+ * but deliberately not reused — WeChat errors are HTTP 200 + `errcode`/`errmsg`, unlike Juejin's `err_no`/`err_msg`.
  *
- * ⚠️ 关于**个人订阅号**的两条硬限制(决定了本模块只做到「建草稿」):
- *
- * - 群发接口(`message/mass/sendall`)与发布接口(`freepublish/submit`)**仅认证号可调**,
- *   个人主体调用返回 `48001`。所以没有任何接口能把文章真正发出去,发表那一步
- *   必须在公众号后台点(后台自带「定时发表」)。
- * - `draft/add`(新增草稿)**个人号可用** —— 这也是本模块存在的理由。
- *
- * ⚠️ `access_token` 要求调用方的**公网出口 IP 在后台 IP 白名单里**,否则 `40164`。
- * 家用宽带 IP 会变,这是这条路径唯一的日常维护点。报这个错时会把出口 IP
- * 从错误信息里抠出来直接打给用户,省掉一轮排查。
+ * ⚠️ Personal subscription accounts: `message/mass/sendall` and `freepublish/submit` are verified-only (return `48001`),
+ * so the final publish must be clicked in the backend; `draft/add` does work for personal accounts — why this module exists.
+ * ⚠️ `access_token` needs the caller's egress IP in the backend whitelist, else `40164`; home IPs change.
  */
 
 const BASE = 'https://api.weixin.qq.com';
@@ -33,24 +24,24 @@ export interface WechatHooks {
   onDebug?: (msg: string) => void;
 }
 
-/** 出错的原因分类 —— 调用方据此给不同的可操作提示,而不是笼统一句「失败了」 */
+/** Error categories drive actionable hints instead of a vague "it failed" */
 export type WechatErrorKind =
-  /** 网络层:超时、DNS、连接中断 —— 重试可能有用 */
+  /** Network layer: timeout, DNS, connection drop — retry may help */
   | 'network'
-  /** 40164:出口 IP 不在白名单 —— 必须去后台加白名单 */
+  /** 40164: egress IP not whitelisted — must whitelist in the backend */
   | 'ip-whitelist'
-  /** 48001 等:账号没有该接口权限(个人订阅号发不了文章就是这一类) */
+  /** 48001 etc.: account lacks permission (a personal account cannot publish) */
   | 'permission'
-  /** 40001/42001:access_token 失效 */
+  /** 40001/42001: access_token expired */
   | 'token'
-  /** 其它接口错误 */
+  /** Other API errors */
   | 'api';
 
 export type WechatResult<T> =
   | { ok: true; data: T }
   | { ok: false; errMsg: string; kind: WechatErrorKind; errCode: number };
 
-/** 微信的错误信封:HTTP 200,错误在 body 里 */
+/** WeChat error envelope: HTTP 200, error in the body */
 interface Envelope {
   errcode?: number;
   errmsg?: string;
@@ -64,36 +55,35 @@ function classify(errcode: number): WechatErrorKind {
 }
 
 /**
- * 把错误翻译成「下一步该做什么」。
- * 40164 的错误信息里带着出口 IP,抠出来直接给用户,免得他再去搜「怎么看我公网 IP」。
+ * Turn an error into "what to do next"; the 40164 message carries the egress IP, extracted for direct display.
  */
 export function errorHint(kind: WechatErrorKind, errmsg: string): string {
   switch (kind) {
     case 'ip-whitelist': {
       const ip = /invalid ip\s+([0-9a-fA-F.:]+)/.exec(errmsg)?.[1] ?? '';
       return (
-        `出口 IP${ip ? ` ${ip}` : ''} 不在 IP 白名单里。\n` +
-        `  去微信开发者平台(developers.weixin.qq.com/platform/)→ 我的业务 → 公众号\n` +
-        `    → 基础信息 → 开发密钥 →「API IP 白名单」,` +
-        `${ip ? `把 ${ip} 加进去` : '把本机公网 IP 加进去'}。\n` +
-        `  ⚠️ 2025-12-01 起这一项已从公众号后台的「开发接口管理」迁到开发者平台。\n` +
-        `  不支持通配符(写 172.0.0.1 或 172.0.0.1/24,不能写 172.0.0.*),也不带端口;\n` +
-        `  保存后要等几分钟生效。家用宽带 IP 会变,变了要重新加。\n` +
-        `  当前出口 IP 可用 node src/publish/wechat.ts --ip 查。`
+        `Egress IP${ip ? ` ${ip}` : ''} is not in the IP whitelist.\n` +
+        `  Go to the WeChat Developer Platform (developers.weixin.qq.com/platform/) → My Business → Official Account\n` +
+        `    → Basic Info → Developer Keys → "API IP Whitelist", and ` +
+        `${ip ? `add ${ip}` : 'add the public IP of this machine'}.\n` +
+        `  ⚠️ As of 2025-12-01 this item has moved from "Development Interface Management" in the Official Accounts backend to the Developer Platform.\n` +
+        `  Wildcards are not supported (write 172.0.0.1 or 172.0.0.1/24, not 172.0.0.*), and no port;\n` +
+        `  after saving it takes a few minutes to take effect. Home broadband IPs change, so re-add it when they do.\n` +
+        `  You can check the current egress IP with node src/publish/wechat.ts --ip.`
       );
     }
     case 'permission':
       return (
-        `该账号没有这个接口的权限(48001)。\n` +
-        `  群发/发布接口**仅认证号**可调,个人订阅号只能用草稿箱接口 ——\n` +
-        `  这是微信的限制,不是脚本的问题;最后一篇要手动在后台点发表。`
+        `This account does not have permission for this endpoint (48001).\n` +
+        `  The mass-send/publish endpoints **can only be called by verified accounts**; a personal subscription account can only use the draft-box endpoints —\n` +
+        `  this is a WeChat limitation, not a problem with the script; the final publish must be clicked manually in the backend.`
       );
     case 'token':
-      return 'access_token 失效(40001/42001),重跑一次即可(脚本每次运行会重新取 token)。';
+      return 'access_token expired (40001/42001); just run it again (the script fetches a new token on every run).';
     case 'network':
-      return '网络请求失败(超时或连接中断),稍后重试。';
+      return 'Network request failed (timeout or connection drop); try again later.';
     default:
-      return '接口返回错误,见上面的 errcode/errmsg。';
+      return 'The API returned an error; see the errcode/errmsg above.';
   }
 }
 
@@ -102,15 +92,10 @@ function debug(hooks: WechatHooks, msg: string): void {
 }
 
 /**
- * 发一个请求。
- * `retries` 是**额外**重试次数(0 表示只试一次)。
- *
- * ⚠️ 重试次数按端点的副作用给:
- * - `token` 1 次(幂等,取新 token 会让旧 token 失效,但每次运行本来就只取一次)
- * - `material/add_material` 1 次(重复上传只是多一份素材,无害)
- * - `draft/add` **3 次** —— 与掘金的「发布不重试」相反:草稿不公开,
- *   最坏是多一个草稿,`--check` 能立刻对出重复;而漏建一篇要人工补,更烦。
- * - 只读接口 1 次
+ * Send one request; `retries` is extra attempts (0 = one try).
+ * Retry count by side effect: token 1 (idempotent), material/add_material 1 (a duplicate asset is harmless),
+ * draft/add 3 (drafts are not public, so worst case is one extra draft that `--check` reconciles — unlike Juejin's no-retry publish),
+ * read-only 1.
  */
 async function request<T extends Envelope>(
   url: string,
@@ -121,25 +106,25 @@ async function request<T extends Envelope>(
 ): Promise<WechatResult<T>> {
   let lastErr = '';
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt > 0) debug(hooks, `  重试 ${attempt}/${retries}`);
+    if (attempt > 0) debug(hooks, `  Retry ${attempt}/${retries}`);
     try {
       const res = await fetch(url, { ...init, signal: AbortSignal.timeout(opts.timeoutMs) });
       const text = await res.text();
       if (!res.ok) {
         lastErr = `HTTP ${res.status}: ${text.slice(0, 200)}`;
-        continue; // HTTP 层的 5xx/网关错误值得重试
+        continue; // HTTP-layer 5xx/gateway errors are worth retrying
       }
       let body: T;
       try {
         body = JSON.parse(text) as T;
       } catch {
-        return { ok: false, errMsg: `返回的不是 JSON: ${text.slice(0, 200)}`, kind: 'api', errCode: 0 };
+        return { ok: false, errMsg: `Response is not JSON: ${text.slice(0, 200)}`, kind: 'api', errCode: 0 };
       }
       const code = body.errcode ?? 0;
       if (code === 0) return { ok: true, data: body };
       const kind = classify(code);
       const errmsg = body.errmsg ?? '';
-      // token 失效 / 网络类错误可以重试,权限与 IP 白名单重试多少次都一样
+      // token expiry / network errors can retry; permission and IP-whitelist never benefit
       if (kind === 'token' && attempt < retries) {
         lastErr = `${code} ${errmsg}`;
         continue;
@@ -155,13 +140,12 @@ async function request<T extends Envelope>(
 // ============ access_token ============
 
 /**
- * token 只在**一次运行内**缓存(不落盘)。
- * 落盘能少一次请求,但会把一个凭据多写一份到磁盘上 —— 而每次运行取一次
- * 完全够用(微信侧对取 token 的频率有上限,但没有到「每次运行取一次」会超的程度)。
+ * Cached only within one run (never on disk): persisting saves one request but writes another copy of a credential,
+ * and one fetch per run is well within WeChat's rate cap.
  */
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-/** 提前 5 分钟过期,避免卡在边界上 */
+/** Expire 5 min early to avoid boundary races */
 const TOKEN_SAFETY_MS = 5 * 60 * 1000;
 
 export async function getAccessToken(
@@ -169,13 +153,13 @@ export async function getAccessToken(
   hooks: WechatHooks = {},
 ): Promise<WechatResult<string>> {
   if (cachedToken && cachedToken.expiresAt - Date.now() > TOKEN_SAFETY_MS) {
-    debug(hooks, '复用本次运行已取得的 access_token');
+    debug(hooks, 'Reusing the access_token already obtained in this run');
     return { ok: true, data: cachedToken.value };
   }
   const url =
     `${BASE}/cgi-bin/token?grant_type=client_credential` +
     `&appid=${encodeURIComponent(opts.appId)}&secret=${encodeURIComponent(opts.appSecret)}`;
-  debug(hooks, 'GET /cgi-bin/token (appid 与 secret 不回显)');
+  debug(hooks, 'GET /cgi-bin/token (appid and secret are not echoed)');
   const res = await request<Envelope & { access_token?: string; expires_in?: number }>(
     url,
     { method: 'GET' },
@@ -185,17 +169,17 @@ export async function getAccessToken(
   );
   if (!res.ok) return res;
   const token = res.data.access_token;
-  if (!token) return { ok: false, errMsg: '返回里没有 access_token', kind: 'api', errCode: 0 };
+  if (!token) return { ok: false, errMsg: 'The response has no access_token', kind: 'api', errCode: 0 };
   cachedToken = { value: token, expiresAt: Date.now() + (res.data.expires_in ?? 7200) * 1000 };
   return { ok: true, data: token };
 }
 
-/** 供测试/多次运行使用:清掉内存里的 token */
+/** For tests/multiple runs: clear the in-memory token */
 export function resetTokenCache(): void {
   cachedToken = null;
 }
 
-// ============ 永久素材(封面) ============
+// ============ Permanent assets (cover) ============
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -205,11 +189,7 @@ const MIME: Record<string, string> = {
   '.bmp': 'image/bmp',
 };
 
-/**
- * 手写 multipart 而不是用 FormData/Blob:
- * 仓库的 tsconfig 没有 DOM lib,依赖全局 FormData 的类型在各版本 Node 里不一致;
- * multipart 本身只有「一段头 + 内容 + 结束边界」,手写反而没有不确定性。
- */
+/** Hand-rolled multipart: tsconfig has no DOM lib and global FormData types vary across Node versions */
 function multipartBody(field: string, filePath: string, bytes: Buffer): { body: Buffer; contentType: string } {
   const boundary = `----wechatpublish${Date.now().toString(16)}`;
   const mime = MIME[path.extname(filePath).toLowerCase()] ?? 'image/png';
@@ -226,11 +206,9 @@ function multipartBody(field: string, filePath: string, bytes: Buffer): { body: 
 }
 
 /**
- * 上传永久素材,返回 media_id(可作为草稿封面的 thumb_media_id)。
- *
- * 先按 `thumb` 传,失败再按 `image` 传:
- * `thumb` 类素材有 **64KB** 的硬限制,而公众号封面图通常远超 —— 两者都能当封面用,
- * 所以顺序试比让用户先去压缩图片友好。失败时两个错误都报出来,不吞。
+ * Upload a permanent asset, returning media_id (usable as a draft cover's thumb_media_id).
+ * Tries `thumb` then `image`: `thumb` has a hard 64KB limit that covers usually exceed, and both work as a cover.
+ * Reports both errors on failure, no swallowing.
  */
 export async function uploadThumb(
   filePath: string,
@@ -241,7 +219,7 @@ export async function uploadThumb(
   try {
     bytes = readFileSync(filePath);
   } catch (err) {
-    return { ok: false, errMsg: `读不到封面文件 ${filePath}: ${(err as Error).message}`, kind: 'api', errCode: 0 };
+    return { ok: false, errMsg: `Cannot read cover file ${filePath}: ${(err as Error).message}`, kind: 'api', errCode: 0 };
   }
 
   const tokenRes = await getAccessToken(opts, hooks);
@@ -252,7 +230,7 @@ export async function uploadThumb(
   for (const type of ['thumb', 'image']) {
     const { body, contentType } = multipartBody('media', filePath, bytes);
     const url = `${BASE}/cgi-bin/material/add_material?access_token=${token}&type=${type}`;
-    debug(hooks, `POST /cgi-bin/material/add_material type=${type} (${bytes.length} 字节)`);
+    debug(hooks, `POST /cgi-bin/material/add_material type=${type} (${bytes.length} bytes)`);
     const res = await request<Envelope & { media_id?: string; url?: string }>(
       url,
       { method: 'POST', headers: { 'Content-Type': contentType }, body },
@@ -261,19 +239,19 @@ export async function uploadThumb(
       hooks,
     );
     if (res.ok && res.data.media_id) return { ok: true, data: res.data.media_id };
-    errors.push(`type=${type}: ${res.ok ? '返回里没有 media_id' : res.errMsg}`);
+    errors.push(`type=${type}: ${res.ok ? 'the response has no media_id' : res.errMsg}`);
   }
   return {
     ok: false,
-    errMsg: `上传封面失败(两种素材类型都试过)\n  ${errors.join('\n  ')}`,
+    errMsg: `Cover upload failed (both asset types were tried)\n  ${errors.join('\n  ')}`,
     kind: 'api',
     errCode: 0,
   };
 }
 
-// ============ 草稿 ============
+// ============ Draft ============
 
-/** 新增草稿要传的一篇 */
+/** One article for a draft */
 export interface DraftArticle {
   title: string;
   content: string;
@@ -283,10 +261,7 @@ export interface DraftArticle {
   contentSourceUrl?: string;
 }
 
-/**
- * 把一篇草稿组装成接口要的字段。
- * 空字段一律不传:传 author:'' 之类的空串有可能被判成非法值。
- */
+/** Build the endpoint payload; empty fields are omitted (an empty string like author:'' may be judged invalid) */
 function buildDraftPayload(article: DraftArticle): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     title: article.title,
@@ -302,9 +277,8 @@ function buildDraftPayload(article: DraftArticle): Record<string, unknown> {
 }
 
 /**
- * 新增草稿。
- * ⚠️ 这是**建立侧**的接口:重试可能留下重复草稿(草稿不公开,`--check` 能对出来)。
- * 返回的 media_id 是草稿自己的 id —— 立刻落盘,再建下一篇。
+ * Create a draft (creation-side: a retry may leave a duplicate; drafts are not public, so `--check` reconciles them).
+ * The returned media_id is the draft's own id — persist it immediately, then create the next.
  */
 export async function addDraft(
   article: DraftArticle,
@@ -316,7 +290,7 @@ export async function addDraft(
 
   const payload = buildDraftPayload(article);
 
-  debug(hooks, `POST /cgi-bin/draft/add title="${article.title}" content=${article.content.length} 字符`);
+  debug(hooks, `POST /cgi-bin/draft/add title="${article.title}" content=${article.content.length} chars`);
   const res = await request<Envelope & { media_id?: string }>(
     `${BASE}/cgi-bin/draft/add?access_token=${tokenRes.data}`,
     {
@@ -329,23 +303,16 @@ export async function addDraft(
     hooks,
   );
   if (!res.ok) return res;
-  if (!res.data.media_id) return { ok: false, errMsg: '新增草稿成功但没返回 media_id', kind: 'api', errCode: 0 };
+  if (!res.data.media_id) return { ok: false, errMsg: 'Draft created successfully but no media_id was returned', kind: 'api', errCode: 0 };
   return { ok: true, data: res.data.media_id };
 }
 
 /**
- * 就地更新已有草稿(摘要/正文改了之后用这条,而不是删了重建)。
- *
- * 与 `addDraft` 的两点差别,别写错:
- *   · 路径是 `draft/update`,body 里多一个 `media_id`
- *   · `articles` 是**对象**不是数组(新增时是数组),多一个 `index`
- *
- * 为什么优先用它而不是「删+建」:删+建会换掉 media_id,期间草稿箱里那一期是**不存在**的;
- * 一旦中途失败就是真的丢了。而改摘要恰恰是最常发生的一种改动,不该走那条重路。
- * 更新是幂等的(重发同样的内容不会变成两篇),所以可以放心重试。
- *
- * ⚠️ 它会整体替换这一期,`digest` 为空时不会传 —— 也就是说原有摘要可能被清掉。
- * 我们的期次都有 digest,不受影响;真要让某期「没有摘要」时才需要留意这点。
+ * Update a draft in place (use this after a digest/body change, not delete+recreate).
+ * Differs from `addDraft`: path `draft/update`, an extra `media_id` in the body, and `articles` is an object (not an array) plus an `index`.
+ * Delete+create swaps the media_id and the issue is absent in between — a mid-failure loses it; digest edits are the most
+ * common change, so use this idempotent path (safe to retry).
+ * ⚠️ Replaces the whole issue and omits `digest` when empty, so an existing digest can be cleared — our issues all have one.
  */
 export async function updateDraft(
   mediaId: string,
@@ -358,7 +325,7 @@ export async function updateDraft(
 
   const payload = buildDraftPayload(article);
 
-  debug(hooks, `POST /cgi-bin/draft/update media_id=${mediaId} content=${article.content.length} 字符`);
+  debug(hooks, `POST /cgi-bin/draft/update media_id=${mediaId} content=${article.content.length} chars`);
   const res = await request<Envelope>(
     `${BASE}/cgi-bin/draft/update?access_token=${tokenRes.data}`,
     {
@@ -373,11 +340,7 @@ export async function updateDraft(
   return res.ok ? { ok: true, data: true } : res;
 }
 
-/**
- * 删除草稿(`--force` 重建时用)。
- * 只删草稿,动不到已发表的文章 —— 这也是 `--force` 敢做「删了重建」的底气,
- * 换成已公开的文章绝不会有这个操作。
- */
+/** Delete a draft (for `--force` rebuild); only drafts, never published articles — why `--force` dares to delete+recreate */
 export async function deleteDraft(
   mediaId: string,
   opts: WechatOptions,
@@ -400,7 +363,7 @@ export async function deleteDraft(
   return res.ok ? { ok: true, data: true } : res;
 }
 
-/** 草稿箱里的一条(只取对账需要的字段) */
+/** One draft-box item (only fields needed for reconciliation) */
 export interface DraftBrief {
   mediaId: string;
   title: string;
@@ -410,10 +373,8 @@ export interface DraftBrief {
 }
 
 /**
- * 拉草稿箱(只读)。
- * 用途有两个:对账(本地记的草稿还在不在),以及**在没有配封面图时
- * 从已有草稿里捡一个 thumb_media_id 复用**(封面是必填项,用户手动排好一篇
- * 之后我们就能把封面借过来)。
+ * Fetch the draft box (read-only): reconcile locally recorded drafts, and when no cover is set,
+ * scavenge a `thumb_media_id` from an existing draft (cover is required).
  */
 export async function listDrafts(
   opts: WechatOptions,
@@ -462,17 +423,14 @@ export async function listDrafts(
     }
     const total = res.data.total_count ?? out.length;
     if (out.length === 0 || items.length === 0 || out.length >= total) break;
-    if (offset > 500) break; // 兜底:绝不在分页上转死循环
+    if (offset > 500) break; // Safety net: never loop forever on pagination
   }
   return { ok: true, data: out.filter((d) => d.mediaId) };
 }
 
-// ============ 辅助 ============
+// ============ Helpers ============
 
-/**
- * 查本机公网出口 IP(配 IP 白名单时用)。
- * 走第三方回显服务 —— 只在这个显式命令里调用,不在正常发文流程里调用。
- */
+/** Look up the public egress IP (for whitelist setup); third-party echo, only in this explicit command */
 export async function fetchEgressIp(opts: WechatOptions): Promise<WechatResult<string>> {
   try {
     const res = await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(opts.timeoutMs) });

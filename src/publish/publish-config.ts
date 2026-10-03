@@ -6,61 +6,47 @@ import type { TitleSource } from './articles.ts';
 import { isTTY } from '../shared/ui.ts';
 
 /**
- * 发布配置:每个教程一个文件,放在 **src/publish/configs/** 下 —— 即
- * 「发布」这个项目自己的目录里,与教程迭代那份(`src/iterate/configs/`)完全分开。
+ * Publish config: one file per tutorial under **src/publish/configs/** — this project's
+ * own directory, fully separate from the iterate side (`src/iterate/configs/`). Each side
+ * scans only its own dir, so adding a config to one never affects the other.
  *
- * 两个项目各自持有自己的配置文件,互不扫描、互不干扰:
- * `src/iterate/config.ts` 的 listConfigNames() 只看 `src/iterate/configs/`,
- * 本模块只看 `src/publish/configs/`。所以往任一边加配置文件都不会影响另一边,
- * 也不需要在扫描时按前缀过滤掉对方的东西。
- *
- * ⚠️ 本模块必须**无副作用** —— 配置文件要 `import type { PublishConfig }` 从这里取类型。
- * 若把类型定义在入口 src/publish/juejin.ts(经 publish.ts 派发),导入它会连带执行入口的 main() 和 SIGINT 注册,
- * 用户只想读个类型结果开始发文章。这也是 TutorialConfig 住在 config.ts 而非 run.ts 的原因。
+ * Must stay **side-effect free**: config files `import type { PublishConfig }` from here.
+ * Defining the type in the entry (src/publish/juejin.ts) would make that import run the
+ * entry's main() and SIGINT handler just to read a type.
  */
 
-/** 单个教程的发布配置 */
+/** Publish config for a single tutorial */
 export interface PublishConfig {
-  /** 源目录名(相对仓库根),如 'vllm-toturial' */
+  /** Source dir name (relative to repo root), e.g. 'vllm-toturial' */
   sourceDir: string;
-  /** 文件名前缀,匹配 <前缀>-<编号>-<标题>.md,如 'vllm教程' */
+  /** Filename prefix, matching <prefix>-<number>-<title>.md */
   filePrefix: string;
-  /** 起始编号,只发布 >= 它的章节 */
+  /** Starting number; only chapters >= it are published */
   fromNumber: number;
-  /**
-   * 标题取原文 H1 还是文件名(去掉 `.md`)。
-   * 省略时按 'h1'。掘金上前几章用的是文件名形式,`--rename` 也按它对齐。
-   */
+  /** Title from the source H1 or the filename (without `.md`); defaults to 'h1'. `--rename` aligns to it too. */
   titleSource?: TitleSource;
-  /**
-   * 只在 `titleSource: 'fileName'` 时生效:给标题补的系列名前缀。
-   * 用于源文件名本身没有系列前缀的教程(ai-agent-toturial 的文件叫 `00-前言与导读`,
-   * 配上 `'ai-agent教程-'` 就成了 `ai-agent教程-00-前言与导读`)。
-   */
+  /** Only with `titleSource: 'fileName'`: series-name prefix for tutorials whose filenames lack one. */
   titlePrefix?: string;
-  /** 掘金分类 id(用 --categories 查真实值) */
+  /** Juejin category id (look up real values with --categories) */
   categoryId: string;
-  /** 掘金标签 id 列表(**最多 3 个**,服务端实测限制;用 --tags <关键词> 查真实值) */
+  /** Juejin tag id list (**max 3**, a server-side limit; look up real values with --tags <keyword>) */
   tagIds: string[];
-  /** 封面图 URL;空串表示留空,靠人工在编辑器里设置后从草稿读回 */
+  /** Cover image URL; empty string means leave it, set manually in the editor and read back from the draft */
   coverImage: string;
-  /** 每篇摘要,key = 两位编号(如 '09')。必须 50~100 字、单行纯文本 */
+  /** Per-article brief, key = two-digit number (e.g. '09'). Must be 50-100 chars, single-line plain text */
   briefs: Record<string, string>;
-  /** 篇间延迟(毫秒),用于降低风控概率 */
+  /** Delay between articles (ms), to lower rate-limit risk */
   delayMs: number;
-  /** 单次请求超时(毫秒) */
+  /** Per-request timeout (ms) */
   timeoutMs: number;
 }
 
 export const publishConfigsDir = path.resolve(process.cwd(), 'src', 'publish', 'configs');
 
 /**
- * 微信侧配置的文件名前缀(如 `wechat-vllm.ts`)。
- *
- * 掘金与微信两种配置同住 src/publish/configs/(同一个教程的两个平台是一件事,
- * 分目录反而难找),但**类型不同、归各自的入口管**:掘金侧的 pickPublishConfig
- * 一旦把微信配置也算进来,`publish.ts juejin` 就会从「只有一个配置时直用」
- * 变成「有多个配置,请显式指定」—— 平白把已有的用法弄坏。所以两边各按前缀过滤。
+ * Filename prefix for WeChat-side configs (e.g. `wechat-vllm.ts`). Juejin and WeChat
+ * configs share src/publish/configs/, but each entry filters by prefix — otherwise the
+ * Juejin side would see "multiple configs" and stop using its sole-config shortcut.
  */
 export const WECHAT_CONFIG_PREFIX = 'wechat-';
 
@@ -68,7 +54,7 @@ export function publishConfigFileName(name: string): string {
   return path.join(publishConfigsDir, `${name}.ts`);
 }
 
-/** 列出 src/publish/configs/ 下已有的**掘金**发布配置名(文件名去掉 .ts) */
+/** List **Juejin** config names (filenames without .ts) */
 export function listPublishConfigNames(): string[] {
   if (!existsSync(publishConfigsDir)) return [];
   return readdirSync(publishConfigsDir)
@@ -81,29 +67,29 @@ export function hasPublishConfig(name: string): boolean {
   return existsSync(publishConfigFileName(name));
 }
 
-/** 加载某个发布配置,并校验必填项 */
+/** Load a publish config */
 export async function loadPublishConfig(name: string): Promise<PublishConfig> {
   const url = pathToFileURL(publishConfigFileName(name)).href;
   const mod = (await import(url)) as { default?: PublishConfig };
-  if (!mod.default) throw new Error(`发布配置 ${name} 缺少 default 导出`);
+  if (!mod.default) throw new Error(`Publish config ${name} is missing a default export`);
   return mod.default;
 }
 
-/** 未指定配置名时:只有一个就直用,多个则交互选择(TTY),否则报错并列出 */
+/** Pick a config: sole one is used directly, several prompt on a TTY, else error */
 export async function pickPublishConfig(): Promise<PublishConfig> {
   const names = listPublishConfigNames();
   if (names.length === 0) {
-    throw new Error('src/publish/configs/ 下还没有发布配置,复制一份改名即可新建');
+    throw new Error('No publish config under src/publish/configs/ yet; copy one and rename it to create a new one');
   }
   if (names.length === 1) return loadPublishConfig(names[0]);
 
   if (isTTY()) {
     const name = await select({
-      message: '选择要发布的教程配置:',
+      message: 'Select the tutorial config to publish:',
       options: names.map((n) => ({ value: n, label: n })),
     });
     if (typeof name !== 'string' || !name) process.exit(130);
     return loadPublishConfig(name);
   }
-  throw new Error(`src/publish/configs/ 下有多个配置(${names.join(', ')}),请显式指定配置名`);
+  throw new Error(`Multiple configs under src/publish/configs/ (${names.join(', ')}); specify a config name explicitly`);
 }

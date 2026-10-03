@@ -4,25 +4,25 @@ import { pathToFileURL } from 'node:url';
 import { select } from '@clack/prompts';
 import { isTTY } from '../shared/ui.ts';
 
-/** 单个教程的完整配置;每个 src/iterate/configs/<名称>.ts 文件默认导出一个该对象 */
+/** Config for one tutorial; each src/iterate/configs/<name>.ts default-exports one */
 export interface TutorialConfig {
-  /** 终端标题 */
+  /** Terminal title */
   title: string;
-  /** 目标目录名(结果保存到 ./<targetDir>/ 下) */
+  /** Results are saved under ./<targetDir>/ */
   targetDir: string;
-  /** claude 启动参数 */
+  /** claude launch arguments */
   claudeFlags: string[];
-  /** 起始轮次,默认 1;>1 时所有轮次都用精炼模板(配合已有内容续跑) */
+  /** Start round; when >1 every round uses the refine template (resume on existing content) */
   startAt: number;
-  /** true 时只打印每轮提示词,不调用 claude(验证用) */
+  /** When true, print each prompt without invoking claude (verification) */
   dryRun: boolean;
-  /** 初始描述 */
+  /** Initial description */
   description: string;
-  /** 最大迭代次数 */
+  /** Maximum number of iterations */
   maxIterations: number;
-  /** 首轮提示词模板,{description}/{targetDir} 会被替换 */
+  /** Template for round 1; {description}/{targetDir} are substituted */
   firstRoundPrompt: string;
-  /** 精炼轮提示词模板 */
+  /** Refine-round prompt template */
   refinePrompt: string;
 }
 
@@ -32,7 +32,7 @@ export function configFileName(name: string): string {
   return path.join(configsDir, `${name}.ts`);
 }
 
-/** 列出 src/iterate/configs/ 下已有的配置名(文件名去掉 .ts) */
+/** Config names under src/iterate/configs/ (file names without .ts) */
 export function listConfigNames(): string[] {
   if (!existsSync(configsDir)) return [];
   return readdirSync(configsDir)
@@ -45,29 +45,29 @@ export function hasConfig(name: string): boolean {
   return existsSync(configFileName(name));
 }
 
-/** 加载某个已保存的配置 */
+/** Load a saved config */
 export async function loadConfig(name: string): Promise<TutorialConfig> {
   const url = pathToFileURL(configFileName(name)).href;
   const mod = (await import(url)) as { default?: TutorialConfig };
-  if (!mod.default) throw new Error(`配置 ${name} 缺少 default 导出`);
+  if (!mod.default) throw new Error(`Config ${name} is missing a default export`);
   return mod.default;
 }
 
-/** 未指定配置名时:只有一个就直用,多个则交互选择(TTY),否则报错并列出 */
+/** No name given: use the only one, interactively select among several (TTY), else error */
 export async function pickConfig(): Promise<TutorialConfig> {
   const names = listConfigNames();
   if (names.length === 0) {
-    throw new Error('src/iterate/configs/ 下还没有配置文件,复制 src/iterate/configs/ 下任一文件改名即可新建');
+    throw new Error('There is no config file under src/iterate/configs/ yet; copy any file under src/iterate/configs/ and rename it to create one');
   }
   if (names.length === 1) return loadConfig(names[0]);
 
   if (isTTY()) {
     const name = await select({
-      message: '选择要运行的教程配置:',
+      message: 'Select the tutorial config to run:',
       options: names.map((n) => ({ value: n, label: n })),
     });
     if (typeof name !== 'string' || !name) process.exit(130);
     return loadConfig(name);
   }
-  throw new Error(`src/iterate/configs/ 下有多个配置(${names.join(', ')}),请显式指定配置名`);
+  throw new Error(`There are multiple configs under src/iterate/configs/ (${names.join(', ')}); please specify a config name explicitly`);
 }

@@ -35,44 +35,32 @@ import {
 import { dim, error, header, info, isTTY, startSpinner, success } from '../shared/ui.ts';
 
 /**
- * 把教程文章发布到掘金。
+ * Publish tutorial articles to Juejin. Requires a Juejin Cookie: env JUEJIN_COOKIE, or the
+ * gitignored .juejin-cookie in the repo root.
  *
- * 用法:
- *   node src/publish/publish.ts juejin --list              # 列待发文章 + 标题 + 摘要字数(预校验)
- *   node src/publish/publish.ts juejin --categories        # 查掘金真实分类 id
- *   node src/publish/publish.ts juejin --tags vllm         # 按关键词查标签 id
- *   node src/publish/publish.ts juejin --suggest-briefs    # 打印摘要素材(只打印,不改文件)
- *   node src/publish/publish.ts juejin --dry-run           # 只打印不发送
- *   node src/publish/publish.ts juejin                     # 发布(建第 1 篇草稿后暂停等你确认)
- *   node src/publish/publish.ts juejin --yes               # 跳过确认,一次发完
- *   node src/publish/publish.ts juejin --drafts-only       # 只建草稿,不发布(草稿私有,不公开)
- *   node src/publish/publish.ts juejin --from 0 --to 4     # 只处理编号落在区间内的篇目
- *   node src/publish/publish.ts juejin --sync              # 把已有草稿对齐到配置里的标题与摘要
- *                                                  #  (改了 briefs/titleSource 之后跑它,否则草稿不会更新)
- *                                                  # 未发布的只改草稿;已发布的改完就地重新发布
+ * Usage:
+ *   node src/publish/publish.ts juejin --list              # pending articles + brief counts (pre-check)
+ *   node src/publish/publish.ts juejin --categories        # real Juejin category ids
+ *   node src/publish/publish.ts juejin --tags vllm         # tag ids by keyword
+ *   node src/publish/publish.ts juejin --suggest-briefs    # print brief material only
+ *   node src/publish/publish.ts juejin --dry-run           # print only, send nothing
+ *   node src/publish/publish.ts juejin                     # publish (pause after the 1st draft for confirmation)
+ *   node src/publish/publish.ts juejin --yes               # skip confirmation, publish all
+ *   node src/publish/publish.ts juejin --drafts-only       # drafts only, never publish; re-running without it reuses the drafts
+ *   node src/publish/publish.ts juejin --from 0 --to 4     # only articles in the number range
+ *   node src/publish/publish.ts juejin --sync              # align drafts to config titles/briefs (run after editing briefs/titleSource;
+ *                                                         #  unpublished update in place, published re-publish in place)
  *
- * `--drafts-only` 与「发布」共用同一套状态与草稿:只建过草稿的篇目,
- * 之后去掉这个开关重跑,会**复用同一份草稿**直接发布,不会重复建。
- *
- * 退出码:
- *   0   本次待发列表全部处理完
- *   1   参数/配置/校验错误,或发布失败
- *   2   已在确认点暂停,等待人工确认(状态已落盘,可续跑)
- *   130 SIGINT
- *
- * 需要掘金 Cookie:环境变量 JUEJIN_COOKIE,或仓库根目录下 gitignored 的 .juejin-cookie。
+ * Exit codes: 0 done · 1 argument/config/validation error or publish failure · 2 paused at the
+ * confirmation point (state saved, resumable) · 130 SIGINT
  */
 
 const REPO_ROOT = process.cwd();
 
-/** 确认点暂停后的退出码 —— 暂停是检查点,不是失败 */
+/** Exit code after pausing at the confirmation point — pausing is a checkpoint, not a failure */
 const EXIT_PAUSED = 2;
 
-/**
- * 单篇最多标签数。
- * 3 是实测值 —— 建草稿时多给会返回 `err_no=4031 您最多可以为文章添加3个标签`。
- * 这个限制只在真正调接口时才暴露,dry-run 和 --list 都测不出来。
- */
+/** Max tags per article. 3 is the server's measured limit (`err_no=4031 ...at most 3 tags...`), only exposed by the real API. */
 const MAX_TAGS = 3;
 
 interface CliOptions {
@@ -89,7 +77,7 @@ interface CliOptions {
   delayMs: number | null;
   orphans: boolean;
   republish: string | null;
-  /** `--sync`(旧名 `--rename`):把草稿对齐到本地配置的标题与摘要 */
+  /** `--sync` (old name `--rename`): align drafts with the titles and briefs in the local config */
   sync: boolean;
   force: boolean;
   skipBriefCheck: boolean;
@@ -122,7 +110,7 @@ function defaultOptions(): CliOptions {
   };
 }
 
-/** 手写参数解析(与 run.ts 一致,不引入解析库) */
+/** Hand-written arg parsing (like run.ts, no library) */
 function parseArgs(argv: string[]): CliOptions | { error: string } {
   const o = defaultOptions();
   for (let i = 0; i < argv.length; i++) {
@@ -139,7 +127,7 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
       case '--drafts-only': o.draftsOnly = true; break;
       case '--yes': case '-y': o.yes = true; break;
       case '--orphans': o.orphans = true; break;
-      // `--rename` 是旧名,保留作别名(它当时只管标题,现在管标题+摘要)
+      // `--rename` is the old alias (it covered titles only; now titles + briefs)
       case '--sync': case '--rename': o.sync = true; break;
       case '--force': o.force = true; break;
       case '--skip-brief-check': o.skipBriefCheck = true; break;
@@ -147,44 +135,44 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
       case '--debug': o.debug = true; break;
       case '--tags': {
         const v = needValue();
-        if (v === null) return { error: '--tags 需要一个关键词,如 --tags vllm' };
+        if (v === null) return { error: '--tags needs a keyword, e.g. --tags vllm' };
         o.tags = v;
         break;
       }
       case '--only': {
         const v = needValue();
-        if (v === null) return { error: '--only 需要一个编号,如 --only 12' };
+        if (v === null) return { error: '--only needs a number, e.g. --only 12' };
         o.only = v;
         break;
       }
       case '--from': {
         const v = needValue();
-        if (v === null) return { error: '--from 需要一个编号,如 --from 15' };
+        if (v === null) return { error: '--from needs a number, e.g. --from 15' };
         o.from = v;
         break;
       }
       case '--to': {
         const v = needValue();
-        if (v === null) return { error: '--to 需要一个编号,如 --to 04' };
+        if (v === null) return { error: '--to needs a number, e.g. --to 04' };
         o.to = v;
         break;
       }
       case '--republish': {
         const v = needValue();
-        if (v === null) return { error: '--republish 需要一个编号,如 --republish 09' };
+        if (v === null) return { error: '--republish needs a number, e.g. --republish 09' };
         o.republish = v;
         break;
       }
       case '--delay': {
         const v = needValue();
         const n = Number(v);
-        if (v === null || !Number.isFinite(n) || n < 0) return { error: '--delay 需要毫秒数,如 --delay 30000' };
+        if (v === null || !Number.isFinite(n) || n < 0) return { error: '--delay needs a number of milliseconds, e.g. --delay 30000' };
         o.delayMs = n;
         break;
       }
       default: {
-        if (arg.startsWith('--')) return { error: `未知参数: ${arg}` };
-        if (o.configName) return { error: `只能指定一个配置名,多给了: ${arg}` };
+        if (arg.startsWith('--')) return { error: `Unknown argument: ${arg}` };
+        if (o.configName) return { error: `Only one config name may be specified, got extra: ${arg}` };
         o.configName = arg;
       }
     }
@@ -192,18 +180,16 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
   return o;
 }
 
-/** 把 '9' / '09' 都归一成两位编号 */
 function normalizeNo(v: string): string {
   const n = Number(v);
   return Number.isFinite(n) ? String(n).padStart(2, '0') : v;
 }
 
-/** 复用 config.ts 的交互选择逻辑,但作用在发布配置上 */
 async function resolveConfig(name: string | null): Promise<PublishConfig> {
   if (name) {
     if (!hasPublishConfig(name)) {
       throw new Error(
-        `src/publish/src/publish/configs/ 下没有配置: ${name}(可用: ${listPublishConfigNames().join(', ') || '无'})`,
+        `No config under src/publish/src/publish/configs/: ${name} (available: ${listPublishConfigNames().join(', ') || 'none'})`,
       );
     }
     return loadPublishConfig(name);
@@ -211,7 +197,6 @@ async function resolveConfig(name: string | null): Promise<PublishConfig> {
   return pickPublishConfig();
 }
 
-/** 构造调用选项 */
 function buildOptions(cookie: string, cfg: PublishConfig): juejin.JuejinOptions {
   return { cookie, timeoutMs: cfg.timeoutMs };
 }
@@ -219,22 +204,21 @@ function buildOptions(cookie: string, cfg: PublishConfig): juejin.JuejinOptions 
 function buildHooks(opts: CliOptions): juejin.JuejinHooks {
   return {
     onRetry: ({ attempt, errMsg, waitMs }) =>
-      dim(`  ↻ 第 ${attempt} 次重试(${errMsg}),${Math.round(waitMs / 1000)}s 后…`),
+      dim(`  ↻ retry #${attempt} (${errMsg}), in ${Math.round(waitMs / 1000)}s…`),
     onDebug: opts.debug ? (line) => dim(`  [debug] ${line}`) : undefined,
   };
 }
 
-// ============ 子命令 ============
+// ============ Subcommands ============
 
-/** 摘要素材:README 章节导航的一句话 + 正文的引言块 */
+/** Brief material from the README chapter nav + body intro */
 interface BriefMaterial {
-  /** README 表格里的「内容一句话」 */
+  /** The "one-line description" from the README table */
   oneLiner: string;
-  /** 正文开头的引用块(「> 本章目标：…」),09/10/11 没有 */
+  /** The blockquote at the start of the body ("> Chapter goal: ..."), absent for 09/10/11 */
   intro: string;
 }
 
-/** 从 README 的章节导航表 + 正文引言里凑素材 */
 function gatherBriefMaterials(cfg: PublishConfig, articles: Article[]): Map<string, BriefMaterial> {
   const readmePath = path.join(cfg.sourceDir, 'README.md');
   const map = new Map<string, BriefMaterial>();
@@ -245,43 +229,40 @@ function gatherBriefMaterials(cfg: PublishConfig, articles: Article[]): Map<stri
     tableLines = [];
   }
   for (const a of articles) {
-    // README 表格里编号是两位(| 09 |),但也兼容没有前导零的写法
+    // Accept both | 09 | and | 9 |; cells are | no. | [title](file) | one-line description |
     const row = tableLines.find((l) => new RegExp(`^\\|\\s*0?${a.order}\\s*\\|`).test(l));
     const cells = row ? row.split('|').map((c) => c.trim()) : [];
-    // | 编号 | [标题](文件) | 内容一句话 |
     const oneLiner = cells.length >= 4 ? cells[3] : '';
     map.set(a.no, { oneLiner, intro: extractIntro(a.content) });
   }
   return map;
 }
 
-/** --suggest-briefs:把素材摆出来,只打印不改文件 */
 function runSuggestBriefs(cfg: PublishConfig, articles: Article[]): number {
   const materials = gatherBriefMaterials(cfg, articles);
-  header('摘要素材(只打印,不改文件)');
+  header('Brief material (print only, does not modify files)');
   info('');
   for (const a of articles) {
     const current = cfg.briefs[a.no]?.trim() ?? '';
     const { cp } = countBrief(current);
-    const problem = current ? briefProblem(current) : '还没有摘要';
+    const problem = current ? briefProblem(current) : 'no brief yet';
     info(`${a.no}  ${a.title}`);
     const issue = problem ? pc.yellow(`  [${problem}]`) : '';
-    dim(`    当前(${cp} 字)${issue}: ${current || '(空)'}`);
+    dim(`    Current (${cp} chars)${issue}: ${current || '(empty)'}`);
     const material = materials.get(a.no);
     if (material?.oneLiner) dim(`    README: ${material.oneLiner}`);
-    if (material?.intro) dim(`    引言  : ${material.intro.slice(0, 140)}${material.intro.length > 140 ? '…' : ''}`);
+    if (material?.intro) dim(`    Intro : ${material.intro.slice(0, 140)}${material.intro.length > 140 ? '…' : ''}`);
     info('');
   }
   return 0;
 }
 
-/** --list / --dry-run 共用的待发清单与摘要预检 */
 function checkBriefs(cfg: PublishConfig, articles: Article[], skip: boolean): string[] {
   const problems: string[] = [];
   for (const a of articles) {
     const brief = cfg.briefs[a.no]?.trim() ?? '';
     if (!brief) {
-      problems.push(`${a.no} 没有配置摘要`);
+      problems.push(`${a.no} has no brief configured`);
       continue;
     }
     const p = briefProblem(brief);
@@ -290,7 +271,6 @@ function checkBriefs(cfg: PublishConfig, articles: Article[], skip: boolean): st
   return problems;
 }
 
-/** 按 --only / --from / --to 收窄待发范围 */
 function selectArticles(articles: Article[], opts: CliOptions): Article[] {
   let list = articles;
   if (opts.only) {
@@ -310,7 +290,7 @@ function selectArticles(articles: Article[], opts: CliOptions): Article[] {
 
 function runList(cfg: PublishConfig, articles: Article[], opts: CliOptions): number {
   const problems = checkBriefs(cfg, articles, opts.skipBriefCheck);
-  header(`${cfg.sourceDir} 待发布文章`);
+  header(`${cfg.sourceDir} pending articles`);
   info('');
   for (const a of articles) {
     const brief = cfg.briefs[a.no]?.trim() ?? '';
@@ -318,32 +298,31 @@ function runList(cfg: PublishConfig, articles: Article[], opts: CliOptions): num
     const p = briefProblem(brief);
     const mark = p ? pc.red('✖') : briefTight(brief) ? pc.yellow('!') : pc.green('✓');
     info(`${mark} ${a.no}  ${a.title}`);
-    dim(`     ${cp} 字(cp)/${u16}(u16) · 正文 ${a.content.length} 字符 · ${a.fileName}`);
+    dim(`     ${cp} chars(cp)/${u16}(u16) · body ${a.content.length} chars · ${a.fileName}`);
     if (p) error(`     ${p}`);
-    else if (briefHasMarkdown(brief)) dim('     提示: 摘要里含 markdown 标记,掘金按纯文本展示');
+    else if (briefHasMarkdown(brief)) dim('     Hint: the brief contains markdown markup, Juejin displays it as plain text');
   }
   info('');
-  info(`共 ${articles.length} 篇`);
+  info(`${articles.length} articles in total`);
   if (problems.length > 0) {
-    error(`摘要校验未通过(${problems.length} 项),发布前必须先修好:`);
+    error(`Brief validation failed (${problems.length} issues), fix them before publishing:`);
     problems.forEach((p) => error(`  · ${p}`));
     return 1;
   }
   if (!cfg.categoryId) {
-    error('配置里缺少 categoryId,请用 --categories 查到真实 id 后填进配置');
+    error('categoryId is missing from the config; look up the real id with --categories and put it in the config');
     return 1;
   }
   if (cfg.tagIds.length === 0) {
-    error('配置里 tagIds 为空,请用 --tags <关键词> 查到真实 id 后填进配置');
+    error('tagIds is empty in the config; look up the real id with --tags <keyword> and put it in the config');
     return 1;
   }
-  success('摘要与分类/标签配置齐备');
+  success('Brief and category/tag configs are complete');
   return 0;
 }
 
-// ============ 发布主流程 ============
+// ============ Main publish flow ============
 
-/** 建草稿 */
 async function makeDraft(
   cfg: PublishConfig,
   state: PublishState,
@@ -353,7 +332,7 @@ async function makeDraft(
   interactive: boolean,
 ): Promise<{ draftId: string } | null> {
   const brief = cfg.briefs[article.no]?.trim() ?? '';
-  const sp = interactive ? startSpinner(`${article.no} · 建草稿中`) : null;
+  const sp = interactive ? startSpinner(`${article.no} · creating draft`) : null;
   const res = await juejin.createDraft(
     {
       title: article.title,
@@ -368,21 +347,20 @@ async function makeDraft(
   );
 
   if (!res.ok) {
-    sp?.stopError(`✖ ${article.no} 建草稿失败`);
-    error(`✖ ${article.no} 建草稿失败: ${res.errMsg}`);
+    sp?.stopError(`✖ ${article.no} draft creation failed`);
+    error(`✖ ${article.no} draft creation failed: ${res.errMsg}`);
     if (res.authExpired) {
-      error('  登录态已失效。请更新 Cookie 后重跑 —— 此时一篇文章都还没公开。');
+      error('  Login session has expired. Update the Cookie and re-run — at this point no article has been made public yet.');
     }
-    if (res.raw) dim(`  响应: ${res.raw.slice(0, 300)}`);
+    if (res.raw) dim(`  Response: ${res.raw.slice(0, 300)}`);
     return null;
   }
 
   const draftId = res.data?.draftId ?? '';
-  sp?.stopSuccess(`✔ ${article.no} 草稿已建`);
+  sp?.stopSuccess(`✔ ${article.no} draft created`);
   return { draftId };
 }
 
-/** 发布草稿 */
 async function doPublish(
   state: PublishState,
   articleNo: string,
@@ -392,11 +370,11 @@ async function doPublish(
   interactive: boolean,
   save: () => boolean,
 ): Promise<'ok' | 'unknown' | 'failed'> {
-  const sp = interactive ? startSpinner(`${articleNo} · 发布中`) : null;
+  const sp = interactive ? startSpinner(`${articleNo} · publishing`) : null;
   const res = await juejin.publishArticle(draftId, options, hooks);
 
   const st = state.articles[articleNo];
-  // 先落盘「发布请求已发出」,这样无论下面走哪条分支都能正确续跑
+  // Persist "publish sent" first so every branch below can resume correctly
   if (!res.ok) {
     st.publishAttemptedAt = new Date().toISOString();
     st.updatedAt = st.publishAttemptedAt;
@@ -408,37 +386,34 @@ async function doPublish(
     st.status = 'published';
     st.articleId = articleId;
     st.url = articleId ? `https://juejin.cn/post/${articleId}` : null;
-    st.needsCheck = !articleId; // err_no=0 但没给 article_id
+    st.needsCheck = !articleId; // err_no=0 but no article_id given
     st.publishAttemptedAt = null;
     st.updatedAt = new Date().toISOString();
-    sp?.stopSuccess(`✔ ${articleNo} 已发布`);
+    sp?.stopSuccess(`✔ ${articleNo} published`);
     if (res.authExpired) {
-      error('  登录态已失效。请更新 Cookie 后重跑 —— 此时一篇文章都还没公开。');
+      error('  Login session has expired. Update the Cookie and re-run — at this point no article has been made public yet.');
     }
     return 'ok';
   }
 
-  sp?.stopError(`✖ ${articleNo} 发布失败`);
+  sp?.stopError(`✖ ${articleNo} publish failed`);
   if (res.kind === 'business') {
-    error(`✖ ${articleNo} 发布失败: ${res.errMsg}`);
-    if (res.raw) dim(`  响应: ${res.raw.slice(0, 300)}`);
+    error(`✖ ${articleNo} publish failed: ${res.errMsg}`);
+    if (res.raw) dim(`  Response: ${res.raw.slice(0, 300)}`);
     return 'failed';
   }
-  // 网络/超时/5xx:是否已发布不可知,绝不能自动重发
-  error(`✖ ${articleNo} 发布结果未知(${res.errMsg})`);
+  // Network/timeout/5xx: whether it was published is unknown, so we must never auto-resend
+  error(`✖ ${articleNo} publish result unknown (${res.errMsg})`);
   return 'unknown';
 }
 
 /**
- * 发布前校验:草稿里存的正文必须与本地逐字一致。
+ * Pre-publish validation: the draft body must match local text verbatim.
  *
- * 这是本方案里排第一的风险 —— 有开源实现反馈掘金编辑器会在客户端重新渲染
- * Markdown,可能「接口返回成功,但正文是空的/乱码」。实测 detail 接口能读到
- * `mark_content`,所以能自动验:不必靠肉眼看,更不必等 14 篇空文章发出去才发现。
+ * Juejin's editor re-renders Markdown client-side (per an open-source report), so the API can
+ * "succeed" with an empty/garbled body; the detail API's `mark_content` lets us check automatically.
  *
- * 返回 null 表示可以继续;返回字符串表示必须停下的原因。
- * 读不回来不算失败(与封面读回同样的取舍),但**读到了却对不上就一定停** ——
- * 正文不一致时发布是不可逆的,宁可不发。
+ * null = proceed; a string = why we must stop. A read-back mismatch always stops (publishing a bad body is irreversible).
  */
 async function verifyDraftContent(
   article: Article,
@@ -447,8 +422,7 @@ async function verifyDraftContent(
   hooks: juejin.JuejinHooks,
 ): Promise<string | null> {
   const res = await juejin.getDraft(draftId, options, hooks);
-  // ok 为 true 时 data 必然有值(getDraft 在缺 article_draft 时已返回失败),
-  // 但 JuejinResult 的 ok/data 不是可辨识联合,TS 收窄不到,这里显式兜一层
+  // ok=true implies data (getDraft fails if article_draft missing), but ok/data isn't discriminable; guard explicitly
   if (!res.ok || !res.data) return null;
 
   const remote = res.data.markContent.replace(/\r\n/g, '\n');
@@ -456,22 +430,19 @@ async function verifyDraftContent(
 
   if (!remote.trim()) {
     return (
-      `${article.no} 草稿正文是空的 —— 本地 ${article.content.length} 字符没有存进去。\n` +
-      `  草稿 id ${draftId}。不是本地解析的问题,是提交环节丢了正文;发出去会是一篇空文章。`
+      `${article.no} the draft body is empty — the local ${article.content.length} characters were not saved.\n` +
+      `  draft id ${draftId}. This is not a local parsing problem; the submission step lost the body; publishing it would produce an empty article.`
     );
   }
   return (
-    `${article.no} 草稿正文与本地不一致(远端 ${remote.length} 字符 / 本地 ${article.content.length} 字符)。\n` +
-    `  草稿 id ${draftId}。可能是掘金对 Markdown 做了规范化,也可能是提交被截断。`
+    `${article.no} the draft body does not match the local text (remote ${remote.length} chars / local ${article.content.length} chars).\n` +
+    `  draft id ${draftId}. Juejin may have normalized the Markdown, or the submission may have been truncated.`
   );
 }
 
 /**
- * 把人工在掘金编辑器里设置的封面 URL 读回来,存进状态供其余各篇复用。
- *
- * ⚠️ 刻意与「确认门」解耦:`--yes` 会跳过确认,但**封面读回不该跟着被跳过** ——
- * 否则第 1 篇之后各篇建草稿时 state.coverImage 仍是空的,结果只有第一篇带封面。
- * 读不回来不算失败(退化为不带封面),不阻塞发布。
+ * Read back the cover URL set manually in the Juejin editor so remaining articles reuse it.
+ * ⚠️ Not skipped by --yes (else only the first article gets a cover); failure just means no cover.
  */
 async function readBackCover(
   state: PublishState,
@@ -480,29 +451,27 @@ async function readBackCover(
   hooks: juejin.JuejinHooks,
   save: () => boolean,
 ): Promise<void> {
-  // 走 detail 而不是列表接口:列表会把大字段抹成空,封面读回会不可靠
+  // Detail endpoint, not list: the list blanks large fields and breaks cover read-back
   const res = await juejin.getDraft(draftId, options, hooks);
   if (!res.ok) {
-    dim(`  读取草稿详情失败(${res.errMsg}),跳过封面读回,不影响发布。`);
+    dim(`  Failed to read draft detail (${res.errMsg}), skipping cover read-back, publishing is unaffected.`);
     return;
   }
   const cover = res.data?.coverImage ?? '';
   if (cover) {
     state.coverImage = cover;
     save();
-    success('  已读回封面 URL,将复用到其余各篇');
+    success('  Cover URL read back, will be reused for the remaining articles');
     dim(`  ${cover}`);
   } else {
-    dim('  没读到封面 URL(可能还没设置)。继续发布不受影响,其余各篇也不会带封面。');
-    dim('  若想补封面:设置好后重新运行本命令,会重新读取。');
+    dim('  No cover URL was read (it may not be set yet). Continuing to publish is unaffected, and the remaining articles will have no cover either.');
+    dim('  To add a cover: set it and re-run this command, and it will be read again.');
   }
 }
 
 /**
- * 确认点:第 1 篇草稿建好后暂停,让你去编辑器里设封面 + 看排版。
- *
- * `draftsOnly` 只改提示语 —— 建草稿之前的那次停顿在两种模式下都值得有,
- * 因为排版是「发布出去就改不动」的东西,而建草稿是免费的(不公开)。
+ * Confirmation point: pause after the 1st draft to set the cover and check layout.
+ * `draftsOnly` only changes the wording; the pause is worthwhile in both modes.
  */
 async function runGate(
   state: PublishState,
@@ -516,11 +485,11 @@ async function runGate(
 ): Promise<'continue' | 'pause'> {
   const draftUrl = `https://juejin.cn/editor/drafts/${draftId}`;
   const resumeCmd = `node src/publish/publish.ts juejin${draftsOnly ? ' --drafts-only' : ''} --yes`;
-  const whatNext = draftsOnly ? '继续建草稿' : '继续发布';
+  const whatNext = draftsOnly ? 'continue creating drafts' : 'continue publishing';
   info('');
-  header('已建好第 1 篇草稿,请人工确认');
-  info(`  草稿地址: ${draftUrl}`);
-  info(`  请打开它:① 设置封面(桌面上的 1788098108256..jpg) ② 检查 Markdown 排版`);
+  header('The 1st draft is created, please confirm manually');
+  info(`  Draft URL: ${draftUrl}`);
+  info(`  Please open it: (1) set the cover (the 1788098108256..jpg on the desktop) (2) check the Markdown layout`);
   info('');
 
   await readBackCover(state, draftId, options, hooks, save);
@@ -528,20 +497,20 @@ async function runGate(
 
   const interactive = isTTY();
   if (!interactive) {
-    // 非 TTY:不猜、不阻塞。草稿已建好(无公开副作用),状态已落盘
-    info(`  确认排版无误后运行: ${resumeCmd}`);
-    info(`  (会复用已建好的草稿,不会重复建草稿)`);
+    // Non-TTY: don't guess or block — draft created, state saved
+    info(`  Once you've confirmed the layout is fine, run: ${resumeCmd}`);
+    info(`  (reuses the created draft, will not create a duplicate)`);
     return 'pause';
   }
 
   const ans = await confirm({
-    message: `确认排版与封面无误后${whatNext}这篇及剩余 ${remaining} 篇?`,
+    message: `Once you've confirmed the layout and cover are fine, ${whatNext} this article and the remaining ${remaining}?`,
   });
   if (typeof ans !== 'boolean') process.exit(130);
   if (!ans) {
     info('');
-    info(`已暂停。确认无误后运行: ${resumeCmd}`);
-    info(`草稿 id 已保存(${draftId}),重跑会复用它,不会重复建草稿。`);
+    info(`Paused. Once confirmed, run: ${resumeCmd}`);
+    info(`Draft id saved (${draftId}); re-running will reuse it and will not create a duplicate.`);
     return 'pause';
   }
   return 'continue';
@@ -551,7 +520,7 @@ export async function run(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if ('error' in parsed) {
     error(parsed.error);
-    error('用法: node src/publish/publish.ts juejin [配置名] [--list|--dry-run|--yes|--only NN|--from NN|...]');
+    error('Usage: node src/publish/publish.ts juejin [config name] [--list|--dry-run|--yes|--only NN|--from NN|...]');
     return 1;
   }
   const opts = parsed;
@@ -577,18 +546,17 @@ export async function run(argv: string[]): Promise<number> {
   }
   const all = loaded.articles;
 
-  // ---- 不需要网络的子命令 ----
+  // ---- Subcommands that need no network ----
   if (opts.suggestBriefs) return runSuggestBriefs(cfg, all);
   if (opts.list) return runList(cfg, selectArticles(all, opts), opts);
 
-  // ---- 以下需要 Cookie。dry-run 不发任何请求,没 Cookie 也放行 ----
+  // ---- Below requires a Cookie. dry-run sends no requests, so it is allowed without one ----
   const cookieResult = juejin.loadCookie(REPO_ROOT);
   const cookieError = 'error' in cookieResult ? cookieResult.error : null;
   const cookie = 'error' in cookieResult ? '' : cookieResult.cookie;
   const options = buildOptions(cookie, cfg);
   const hooks = buildHooks(opts);
 
-  /** 正式发布必须有 Cookie */
   const requireCookie = (): boolean => {
     if (cookieError) {
       error(cookieError);
@@ -597,14 +565,14 @@ export async function run(argv: string[]): Promise<number> {
     return true;
   };
 
-  // --categories / --tags 实测不需要登录态(见 juejin.ts 的端点注释),没 Cookie 也放行
+  // --categories/--tags need no login in testing (see juejin.ts endpoints), allowed without a Cookie
   if (opts.categories) {
-    header('掘金分类');
+    header('Juejin categories');
     const res = await juejin.queryCategories(options, hooks);
     if (!res.ok) {
-      error(`查询失败: ${res.errMsg}`);
-      if (res.authExpired) error('  登录态已失效,请更新 Cookie。');
-      if (res.raw) dim(`  响应: ${res.raw.slice(0, 300)}`);
+      error(`Query failed: ${res.errMsg}`);
+      if (res.authExpired) error('  Login session has expired, please update the Cookie.');
+      if (res.raw) dim(`  Response: ${res.raw.slice(0, 300)}`);
       return 1;
     }
     for (const c of res.data ?? []) info(`  ${c.categoryId}  ${c.categoryName}`);
@@ -612,20 +580,20 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   if (opts.tags !== null) {
-    header(`掘金标签: ${opts.tags}`);
+    header(`Juejin tags: ${opts.tags}`);
     const res = await juejin.queryTags(opts.tags, options, hooks);
     if (!res.ok) {
-      error(`查询失败: ${res.errMsg}`);
-      if (res.authExpired) error('  登录态已失效,请更新 Cookie。');
-      if (res.raw) dim(`  响应: ${res.raw.slice(0, 300)}`);
+      error(`Query failed: ${res.errMsg}`);
+      if (res.authExpired) error('  Login session has expired, please update the Cookie.');
+      if (res.raw) dim(`  Response: ${res.raw.slice(0, 300)}`);
       return 1;
     }
-    if ((res.data ?? []).length === 0) info('  (没有匹配的标签)');
+    if ((res.data ?? []).length === 0) info('  (no matching tags)');
     for (const t of res.data ?? []) info(`  ${t.tagId}  ${t.tagName}`);
     return 0;
   }
 
-  // ---- 发布流程 ----
+  // ---- Publish flow ----
   if (!opts.dryRun && !requireCookie()) return 1;
 
   const ignoreProblem = assertCookieIgnored(REPO_ROOT);
@@ -657,25 +625,15 @@ export async function run(argv: string[]): Promise<number> {
 }
 
 /**
- * 把**本地配置**与**掘金上已有的草稿**对齐(`--sync`,旧名 `--rename`)。
+ * Align the **local config** with the **drafts already on Juejin** (`--sync`, old name `--rename`).
  *
- * 为什么需要它:标题和摘要都会在配置里被改,而草稿一旦建好就冻在那儿 ——
- * 建草稿时的正文哈希只覆盖「标题+正文」,摘要改了哈希不变,于是重跑 `--publish`
- * 会认为「草稿已是最新」而静默跳过,改了的摘要永远推不上去。`--sync` 就是补这条路。
+ * The draft hash covers only title+body, so a changed brief is invisible and --publish would skip the draft forever.
  *
- * 它能处理的两种状态:
- *   · `drafted`  —— 就地改草稿,不发布(草稿仍是私有的)
- *   · `published`—— 改草稿 + 重新 publish。实测 publish 是**就地更新**:article_id
- *                   不变、链接不变、阅读量等数据保留,只是内容换了。
+ * ⚠️ `article_draft/update` needs all fields (title-only risks wiping the body): title/brief from
+ * config, body only when `contentHash` changed, category/tags/cover from remote.
  *
- * ⚠️ `article_draft/update` 必须带全字段(只传 title 有把正文清空的风险),所以:
- *   · 标题、摘要 —— 取本地配置的当前值(这正是要同步的东西)
- *   · 正文 —— **只在源文件真的改过时**才换(`contentHash` 变了才动),否则原样传回
- *     远端读到的那份。不碰没打算碰的东西。
- *   · 分类/标签/封面 —— 优先用远端已有的值
- *
- * 安全阀:改完先**回读草稿**确认标题与摘要生效、且正文长度没变,才继续。
- * 正文被误改时就停住 —— 已公开文章的正文被删是不可逆的。
+ * `drafted` updates in place; `published` re-publishes in place (article_id/link/stats kept).
+ * Read back after update: a clobbered public body is irreversible, so any mismatch stops the run.
  */
 async function runSync(
   cfg: PublishConfig,
@@ -697,45 +655,42 @@ async function runSync(
 
   const selected = selectArticles(all, opts);
   if (selected.length === 0) {
-    error('没有匹配的文章(检查 --only / --from 的编号范围)');
+    error('No matching articles (check the number range of --only / --from)');
     return 1;
   }
 
-  // ---- 预检:全量报出不能同步的,一篇都不动 ----
+  // ---- Pre-check: list everything that can't sync; touch nothing ----
   const problems: string[] = [];
   for (const a of selected) {
     const st = state.articles[a.no];
-    if (!st) problems.push(`${a.no} 状态文件里没有记录`);
-    else if (st.status === 'pending') problems.push(`${a.no} 还没建过草稿,先跑 --drafts-only`);
-    else if (!st.draftId) problems.push(`${a.no} 没有记录草稿 id,无法同步`);
+    if (!st) problems.push(`${a.no} has no record in the state file`);
+    else if (st.status === 'pending') problems.push(`${a.no} has no draft yet, run --drafts-only first`);
+    else if (!st.draftId) problems.push(`${a.no} has no recorded draft id, cannot sync`);
   }
   if (problems.length > 0) {
-    error(`有 ${problems.length} 篇不能同步,本次一篇都不会动:`);
+    error(`There are ${problems.length} articles that cannot be synced, none will be touched this run:`);
     problems.forEach((p) => error(`  · ${p}`));
     return 1;
   }
 
   const delayMs = opts.delayMs ?? cfg.delayMs;
   const interactive = isTTY();
-  header(`同步草稿 ${cfg.sourceDir} → 掘金`);
+  header(`Sync drafts ${cfg.sourceDir} → Juejin`);
   dim(
-    `  标题来源: ${cfg.titleSource === 'fileName' ? '文件名(−.md)' : '原文 H1'} · ` +
-      `待处理 ${selected.length} 篇 · ${opts.dryRun ? 'dry-run' : '对齐标题与摘要,已发布的重新发布'}`,
+    `  Title source: ${cfg.titleSource === 'fileName' ? 'file name (−.md)' : 'original H1'} · ` +
+      `pending ${selected.length} articles · ${opts.dryRun ? 'dry-run' : 'align titles and briefs, re-publish published ones'}`,
   );
   info('');
 
-  // 读线上**文章记录**的标题。
-  // 掘金把草稿标题同步到文章记录是**异步**的,而且不保证一次就生效(实测:同一批
-  // 里有的几分钟就变,有的重发一次才变)。所以「本地记着改过了」不等于
-  // 「线上已经是新标题」—— 只看本地状态会把没同步的当成已完成而永远跳过。
-  // dry-run 不发任何请求,退化为只看本地记录。
+  // Read titles from the **online article record**: Juejin syncs draft titles to it asynchronously
+  // and not always on the first try, so local records alone would skip un-synced articles forever (dry-run: local only).
   const liveTitles = new Map<string, string>();
   if (!opts.dryRun) {
     const liveRes = await juejin.listArticles(options, hooks);
     if (liveRes.ok) {
       for (const a of liveRes.data ?? []) liveTitles.set(a.articleId, a.title);
     } else {
-      dim(`  ! 读线上文章列表失败(${liveRes.errMsg}),本次只按本地记录判断是否已改。`);
+      dim(`  ! Failed to read the online article list (${liveRes.errMsg}), this run judges changes from local records only.`);
     }
   }
 
@@ -744,60 +699,57 @@ async function runSync(
 
   for (const article of selected) {
     const st = state.articles[article.no];
-    // 读不到就当未知(例如文章数超过一页),此时按本地记录走,不能当成「不匹配」
+    // Unreadable → unknown (e.g. more than one page); use the local record, don't call it a mismatch
     const live = st.articleId ? liveTitles.get(st.articleId) : undefined;
 
     const wantBrief = cfg.briefs[article.no]?.trim() ?? '';
     const titleSame = st.title === article.title;
-    // 老状态文件没有 brief 字段 → undefined ≠ wantBrief → 会走一次全量刷新,正是想要的
+    // Old state files lack a brief field → undefined ≠ wantBrief → one full refresh, as intended
     const briefSame = st.brief === wantBrief;
     const bodySame = st.contentHash === article.contentHash;
 
-    // 三样都对齐、线上标题也对(或读不到)→ 完成态,不再碰(幂等)
+    // All three aligned and live title matches too (or unreadable) → done, skip (idempotent)
     if (titleSame && briefSame && bodySame && (live === undefined || live === article.title)) {
-      dim(`✓ ${article.no} 标题、摘要、正文都已是目标值,跳过`);
+      dim(`✓ ${article.no} title, brief, and body are already at the target values, skipping`);
       skipped++;
       continue;
     }
     if (titleSame && live !== undefined && live !== article.title) {
-      // 上次改完草稿也发过,但掘金的异步同步没生效 —— 草稿已是目标标题,
-      // 下面自然会走「只补发布」那条路,不会重复改草稿
-      dim(`  ! ${article.no} 线上标题仍是「${live}」,补发布一次`);
+      // Draft updated+published last time but async sync didn't take — it already has the target title, so just re-publish
+      dim(`  ! ${article.no} the online title is still "${live}", publishing once more`);
     }
 
     if (opts.dryRun) {
       const bits: string[] = [];
-      if (!titleSame) bits.push(`标题「${st.title ?? '(未记录)'}」→「${article.title}」`);
-      if (!briefSame) bits.push(st.brief === undefined ? '摘要(首次记录)' : '摘要');
-      if (!bodySame) bits.push('正文');
-      if (bits.length === 0) bits.push('仅补发布');
+      if (!titleSame) bits.push(`title "${st.title ?? '(not recorded)'}" → "${article.title}"`);
+      if (!briefSame) bits.push(st.brief === undefined ? 'brief (first recording)' : 'brief');
+      if (!bodySame) bits.push('body');
+      if (bits.length === 0) bits.push('publish only');
       info(`${article.no}  ${bits.join(' · ')}`);
       synced++;
       continue;
     }
 
     const draftId = st.draftId as string;
-    const sp = interactive ? startSpinner(`${article.no} · 读草稿`) : null;
+    const sp = interactive ? startSpinner(`${article.no} · read draft`) : null;
     const detail = await juejin.getDraft(draftId, options, hooks);
     if (!detail.ok || !detail.data) {
-      sp?.stopError(`✖ ${article.no} 读取草稿失败`);
-      error(`✖ ${article.no} 读取草稿失败: ${detail.errMsg}`);
-      if (detail.authExpired) error('  登录态已失效,请更新 Cookie 后重跑。');
-      if (detail.raw) dim(`  响应: ${detail.raw.slice(0, 300)}`);
+      sp?.stopError(`✖ ${article.no} failed to read draft`);
+      error(`✖ ${article.no} failed to read draft: ${detail.errMsg}`);
+      if (detail.authExpired) error('  Login session has expired, please update the Cookie and re-run.');
+      if (detail.raw) dim(`  Response: ${detail.raw.slice(0, 300)}`);
       return 1;
     }
     const remote = detail.data;
-    sp?.stopSuccess(`✔ ${article.no} ${remote.title || '(无标题)'}`);
+    sp?.stopSuccess(`✔ ${article.no} ${remote.title || '(no title)'}`);
 
-    // 远端已是目标值,但状态里没记成功过 —— 说明上次改完草稿就中断了,
-    // 不能当作「已完成」跳过,补一次发布即可(不必再改一遍草稿)
+    // Remote at target but success never recorded — last run was interrupted after the draft update; just publish
     const needUpdate = remote.title !== article.title || remote.briefContent.trim() !== wantBrief;
 
     if (needUpdate) {
-      // 正文只在**源文件真的改过**时才换。远端读回来的 markdown 可能被掘金规范化过,
-      // 拿它跟本地逐字比会永远「不一致」,于是每次都重写正文 —— 那是不该有的副作用。
+      // Replace the body only when the **source file really changed**: remote markdown may be normalized, so verbatim comparison would rewrite it every run
       const contentChanged = st.contentHash !== article.contentHash;
-      const sp2 = interactive ? startSpinner(`${article.no} · 改草稿`) : null;
+      const sp2 = interactive ? startSpinner(`${article.no} · update draft`) : null;
       const upd = await juejin.updateDraft(
         {
           draftId,
@@ -812,67 +764,67 @@ async function runSync(
         hooks,
       );
       if (!upd.ok) {
-        sp2?.stopError(`✖ ${article.no} 改草稿失败`);
-        error(`✖ ${article.no} 改草稿失败: ${upd.errMsg}`);
-        if (upd.authExpired) error('  登录态已失效,请更新 Cookie 后重跑。');
-        if (upd.raw) dim(`  响应: ${upd.raw.slice(0, 300)}`);
+        sp2?.stopError(`✖ ${article.no} draft update failed`);
+        error(`✖ ${article.no} draft update failed: ${upd.errMsg}`);
+        if (upd.authExpired) error('  Login session has expired, please update the Cookie and re-run.');
+        if (upd.raw) dim(`  Response: ${upd.raw.slice(0, 300)}`);
         return 1;
       }
-      sp2?.stopSuccess(`✔ ${article.no} 草稿已改`);
+      sp2?.stopSuccess(`✔ ${article.no} draft updated`);
 
-      // ---- 安全阀:回读确认标题与摘要生效、正文没被误伤 ----
+      // ---- Safety valve: read back to confirm title/brief took effect and body wasn't clobbered ----
       const after = await juejin.getDraft(draftId, options, hooks);
       if (after.ok && after.data) {
         if (after.data.title !== article.title) {
-          error(`✖ ${article.no} 回读标题仍是「${after.data.title}」,改标题没生效,已停住没有重新发布。`);
+          error(`✖ ${article.no} the title read back is still "${after.data.title}"; the title update did not take effect, stopped without re-publishing.`);
           return 1;
         }
         if (after.data.briefContent.trim() !== wantBrief) {
-          error(`✖ ${article.no} 回读摘要与目标值不一致,已停住没有重新发布(草稿 id ${draftId})。`);
+          error(`✖ ${article.no} the brief read back does not match the target; stopped without re-publishing (draft id ${draftId}).`);
           return 1;
         }
         if (after.data.markContent.length !== remote.markContent.length && !contentChanged) {
           error(
-            `✖ ${article.no} 同步标题/摘要时顺手改动了正文(远端 ${remote.markContent.length} → ` +
-              `${after.data.markContent.length} 字符),已停住没有重新发布。\n` +
-              `  草稿 id ${draftId},线上文章没有受影响。`,
+            `✖ ${article.no} syncing the title/brief incidentally changed the body (remote ${remote.markContent.length} → ` +
+              `${after.data.markContent.length} chars); stopped without re-publishing.\n` +
+              `  draft id ${draftId}, the online article was not affected.`,
           );
           return 1;
         }
       } else {
-        dim('  ! 回读草稿失败,跳过校验(草稿已按目标值提交)');
+        dim('  ! Failed to read the draft back, skipping validation (the draft was submitted with the target values)');
       }
     } else {
-      dim(`  ${article.no} 草稿已是目标值,只需补一次发布`);
+      dim(`  ${article.no} the draft is already at the target value, only needs one more publish`);
     }
 
-    // 草稿这一侧已经对齐 —— 先把状态记上,后面的发布无论成败都不会重复改草稿
+    // Draft side is aligned — record state first so a later publish, success or failure, won't update the draft again
     st.title = article.title;
     st.brief = wantBrief;
     st.contentHash = article.contentHash;
     st.updatedAt = new Date().toISOString();
     if (!save()) return 1;
 
-    // ---- 未发布的草稿:到此为止,不发布 ----
+    // ---- Unpublished draft: stop here, no publish ----
     if (st.status !== 'published') {
-      dim(`  ✔ ${article.no} 草稿已同步(未发布): https://juejin.cn/editor/drafts/${draftId}`);
+      dim(`  ✔ ${article.no} draft synced (not published): https://juejin.cn/editor/drafts/${draftId}`);
       info('');
       synced++;
       if (delayMs > 0 && article !== selected[selected.length - 1]) await delay(delayMs);
       continue;
     }
 
-    // ---- 已发布:重新发布(就地更新,article_id 不变) ----
-    const sp3 = interactive ? startSpinner(`${article.no} · 重新发布`) : null;
+    // ---- Published: re-publish (in-place update, article_id unchanged) ----
+    const sp3 = interactive ? startSpinner(`${article.no} · re-publishing`) : null;
     const pub = await juejin.publishArticle(draftId, options, hooks);
     if (!pub.ok) {
-      sp3?.stopError(`✖ ${article.no} 重新发布失败`);
+      sp3?.stopError(`✖ ${article.no} re-publish failed`);
       st.publishAttemptedAt = new Date().toISOString();
       st.updatedAt = st.publishAttemptedAt;
       save();
-      error(`✖ ${article.no} 重新发布失败: ${pub.errMsg}`);
-      if (pub.raw) dim(`  响应: ${pub.raw.slice(0, 300)}`);
-      dim('  草稿已是新内容但线上还是旧的。确认后用 --sync 重跑,会跳过改草稿、只补发布。');
+      error(`✖ ${article.no} re-publish failed: ${pub.errMsg}`);
+      if (pub.raw) dim(`  Response: ${pub.raw.slice(0, 300)}`);
+      dim('  The draft has the new content but the live version is still old. After confirming, re-run with --sync; it skips the draft update and only publishes.');
       return 1;
     }
 
@@ -893,20 +845,20 @@ async function runSync(
     }
   }
 
-  header(opts.dryRun ? 'dry-run 结束(没有发送任何请求)' : '完成');
+  header(opts.dryRun ? 'dry-run finished (no requests were sent)' : 'Done');
   if (opts.dryRun) {
-    info(`  将要同步: ${synced} 篇`);
-    dim('  dry-run 不联网,这里按本地记录判断;实际运行时还会读草稿逐篇比对。');
+    info(`  To be synced: ${synced} articles`);
+    dim('  dry-run does not go online, so this judges from local records; the actual run also reads each draft and compares.');
     return 0;
   }
 
-  info(`  本次同步: ${synced} 篇 · 跳过(已是目标值): ${skipped} 篇`);
+  info(`  Synced this run: ${synced} articles · skipped (already at target): ${skipped} articles`);
 
-  // 刻意**不**在这里回读线上标题来判断成败:同步是异步的,刚发完几乎必然还没变过来,
-  // 回读只会得到「全都没生效」的假警报。真正可靠的判断在下次运行的开头。
+  // Not reading the live title here: sync is async and won't have changed right after publishing,
+  // so a read-back would just false-alarm. The reliable check is at the next run's start.
   if (synced > 0) {
-    dim('  掘金把草稿标题同步到线上文章记录是异步的 —— 快的几分钟,慢的要再发一次才生效。');
-    dim('  过几分钟再跑一次 --sync 核对:线上标题还没变的会被重新补发布(幂等),已生效的跳过。');
+    dim('  Juejin syncs draft titles to the online article record asynchronously — fast ones take minutes, slow ones need another publish to take effect.');
+    dim('  Re-run --sync in a few minutes to check: titles not yet changed are re-published (idempotent), effective ones are skipped.');
   }
   return 0;
 }
@@ -929,39 +881,38 @@ async function runPublish(
     return true;
   };
 
-  // ---- 遗留草稿清单 ----
   if (opts.orphans) {
     const drafted = Object.entries(state.articles).filter(([, s]) => s.status === 'drafted');
-    header('遗留草稿(--orphans)');
-    if (drafted.length === 0) info('  没有待发布的草稿');
+    header('Orphan drafts (--orphans)');
+    if (drafted.length === 0) info('  No drafts pending publication');
     for (const [no, s] of drafted) {
-      info(`  ${no}  草稿 ${s.draftId}  https://juejin.cn/editor/drafts/${s.draftId}`);
+      info(`  ${no}  draft ${s.draftId}  https://juejin.cn/editor/drafts/${s.draftId}`);
     }
     return 0;
   }
 
   let selected = selectArticles(all, opts);
   if (selected.length === 0) {
-    error(`没有匹配的文章(检查 --only / --from 的编号范围)`);
+    error(`No matching articles (check the number range of --only / --from)`);
     return 1;
   }
 
-  // ---- 摘要预检:在任何网络调用之前一次报出全部不合格项 ----
+  // ---- Brief pre-check: report every failure at once before any network call ----
   const problems = checkBriefs(cfg, selected, opts.skipBriefCheck);
   if (problems.length > 0) {
-    error(`摘要校验未通过(${problems.length} 项),一篇都不会发:`);
+    error(`Brief validation failed (${problems.length} issues), nothing will be published:`);
     problems.forEach((p) => error(`  · ${p}`));
-    dim('  修好配置里的 briefs 后重跑。确实想跳过校验可加 --skip-brief-check。');
+    dim('  Fix the briefs in the config and re-run. To skip validation anyway, add --skip-brief-check.');
     return 1;
   }
   if (!opts.dryRun) {
     if (!cfg.categoryId) {
-      error('配置里缺少 categoryId,请用 --categories 查到真实 id 后填进配置');
+      error('categoryId is missing from the config; look up the real id with --categories and put it in the config');
       return 1;
     }
-    // 上限 3 是掘金服务端实测返回的("您最多可以为文章添加3个标签",err_no=4031)
+    // The limit of 3 is what the Juejin server returned in testing ("you can add at most 3 tags to an article", err_no=4031)
     if (cfg.tagIds.length === 0 || cfg.tagIds.length > MAX_TAGS) {
-      error(`tagIds 必须是 1~${MAX_TAGS} 个(当前 ${cfg.tagIds.length} 个),用 --tags <关键词> 查真实 id`);
+      error(`tagIds must be 1~${MAX_TAGS} (currently ${cfg.tagIds.length}), look up the real id with --tags <keyword>`);
       return 1;
     }
   }
@@ -969,19 +920,19 @@ async function runPublish(
   const interactive = isTTY();
   const delayMs = opts.delayMs ?? cfg.delayMs;
 
-  const mode = opts.dryRun ? 'dry-run' : opts.draftsOnly ? '只建草稿(不发布)' : '实际发布';
-  header(`${opts.draftsOnly ? '建草稿' : '发布'} ${cfg.sourceDir} → 掘金`);
-  dim(`  待处理 ${selected.length} 篇 · 篇间隔 ${delayMs}ms · ${mode}`);
+  const mode = opts.dryRun ? 'dry-run' : opts.draftsOnly ? 'drafts only (no publish)' : 'actual publish';
+  header(`${opts.draftsOnly ? 'Create drafts' : 'Publish'} ${cfg.sourceDir} → Juejin`);
+  dim(`  Pending ${selected.length} articles · interval ${delayMs}ms · ${mode}`);
   if (!opts.dryRun && !opts.draftsOnly) {
-    dim('  提示:一次性连发多篇可能触发掘金风控,被拦时可用 --delay 调大间隔后重跑。');
+    dim('  Hint: publishing many articles in a row may trigger Juejin risk control; if blocked, increase the interval with --delay and re-run.');
   }
   if (opts.draftsOnly) {
-    dim('  草稿是私有的,不公开 —— 发不发、什么时候发,由你在掘金后台逐篇决定。');
+    dim('  Drafts are private and not public — whether to publish and when is up to you, article by article, in the Juejin backend.');
   }
   info('');
 
   let gatePassed = opts.yes;
-  /** --yes 路径下,封面读回最多尝试一次(失败了不必每篇都重试) */
+  /** On the --yes path, try the cover read-back at most once (no need to retry per article) */
   let coverChecked = false;
   let processed = 0;
   let drafted = 0;
@@ -990,29 +941,29 @@ async function runPublish(
   for (const article of selected) {
     const st = ensureArticle(state, article.no, article.contentHash);
 
-    // 已发布:跳过(--republish 显式指定才重发)
+    // Already published: skip (only --republish names a specific article to re-send)
     if (st.status === 'published' && opts.republish !== article.no) {
-      dim(`✓ ${article.no} 已发布,跳过  ${st.url ?? ''}`);
+      dim(`✓ ${article.no} already published, skipping  ${st.url ?? ''}`);
       continue;
     }
 
-    // 上次发布结果未知:绝不自动重发
+    // Last publish result unknown: never auto-resend
     if (st.status === 'drafted' && st.publishAttemptedAt && opts.republish !== article.no) {
-      error(`✖ ${article.no} 上次发布结果未知(${st.publishAttemptedAt}),已停住等你确认。`);
-      info('  请先到掘金创作中心确认这篇文章是否已发布:');
-      info('   · 已发布 → 手工把状态文件里该篇 status 改成 published 并补上 url');
-      info(`   · 未发布 → 用 --republish ${article.no} 重发(会复用已有草稿) `);
+      error(`✖ ${article.no} last publish result unknown (${st.publishAttemptedAt}), stopped waiting for your confirmation.`);
+      info('  First check in the Juejin creator center whether this article was published:');
+      info('   · published → manually change the status of that article in the state file to published and fill in the url');
+      info(`   · not published → re-publish with --republish ${article.no} (reuses the existing draft) `);
       return 1;
     }
 
-    // 正文被改过:草稿已过期
+    // Body changed: the draft is stale
     if (st.status === 'drafted' && st.contentHash !== article.contentHash) {
       if (!opts.force) {
-        error(`✖ ${article.no} 的正文在建草稿后被改过,草稿已过期。`);
-        info('  用 --force 重建草稿(旧草稿会变成孤儿,可用 --orphans 查看),或撤销对源文件的修改。');
+        error(`✖ the body of ${article.no} was changed after the draft was created; the draft is stale.`);
+        info('  Use --force to recreate the draft (the old draft becomes an orphan, viewable with --orphans), or revert the change to the source file.');
         return 1;
       }
-      dim(`  ! ${article.no} 正文已变更,按 --force 重建草稿`);
+      dim(`  ! ${article.no} body changed, recreating the draft per --force`);
       st.status = 'pending';
       st.draftId = null;
       st.contentHash = article.contentHash;
@@ -1022,16 +973,16 @@ async function runPublish(
       const brief = cfg.briefs[article.no]?.trim() ?? '';
       const { cp } = countBrief(brief);
       info(`${article.no}  ${article.title}`);
-      dim(`     分类 ${cfg.categoryId} · 标签 ${cfg.tagIds.join(',')} · 封面 ${state.coverImage || '(空)'}`);
-      dim(`     摘要(${cp} 字): ${brief}`);
-      dim(`     正文 ${article.content.length} 字符,前 3 行:`);
+      dim(`     category ${cfg.categoryId} · tags ${cfg.tagIds.join(',')} · cover ${state.coverImage || '(empty)'}`);
+      dim(`     brief (${cp} chars): ${brief}`);
+      dim(`     body ${article.content.length} chars, first 3 lines:`);
       article.content.split('\n').slice(0, 3).forEach((l) => dim(`       | ${l}`));
       info('');
       planned++;
       continue;
     }
 
-    // ---- 建草稿(先记后发) ----
+    // ---- Create draft (record first, then publish) ----
     let draftId = st.draftId;
     if (!draftId) {
       const made = await makeDraft(cfg, state, article, options, hooks, interactive);
@@ -1042,67 +993,64 @@ async function runPublish(
       st.contentHash = article.contentHash;
       st.brief = cfg.briefs[article.no]?.trim() ?? '';
       st.updatedAt = new Date().toISOString();
-      // 立刻落盘:即使后面发布失败或 Ctrl-C,草稿 id 也不会丢
+      // Persist immediately: the draft id survives even if a later publish fails or the user hits Ctrl-C
       if (!save()) return 1;
-      dim(`  草稿 id: ${draftId}`);
+      dim(`  Draft id: ${draftId}`);
     } else {
-      dim(`  ${article.no} 复用已有草稿 ${draftId}`);
+      dim(`  ${article.no} reusing existing draft ${draftId}`);
     }
 
-    // ---- 确认点 ----
     if (!gatePassed) {
       gatePassed = true;
       const remaining = selected.filter((x) => x.order > article.order).length;
       const gate = await runGate(state, draftId, article, remaining, options, hooks, save, opts.draftsOnly);
       if (gate === 'pause') return EXIT_PAUSED;
     } else if (!coverChecked && !state.coverImage) {
-      // --yes 跳过了确认门,但封面读回不能跟着跳过(见 readBackCover 的注释)
+      // --yes skips the confirmation gate, but the cover read-back must not be skipped with it (see readBackCover)
       coverChecked = true;
       await readBackCover(state, draftId, options, hooks, save);
     }
 
-    // ---- 发布前校验正文真的存进去了 ----
+    // ---- Pre-publish validation that the body really got stored ----
     if (!opts.skipBodyCheck) {
       const bodyProblem = await verifyDraftContent(article, draftId, options, hooks);
       if (bodyProblem) {
         error(`✖ ${bodyProblem}`);
-        error('  已停住,没有发布。确认无误后可用 --skip-body-check 跳过本校验。');
+        error('  Stopped, nothing was published. Once you are sure it is fine, you can skip this validation with --skip-body-check.');
         return 1;
       }
     }
 
-    // ---- 只建草稿模式:到此为止,绝不调发布接口 ----
-    // 状态停在 'drafted'(草稿已建待发布),正是这个模式该有的终态:
-    // 下次不带 --drafts-only 重跑会复用同一份草稿直接发布,不会重复建。
+    // ---- Drafts-only mode: stop here, never call publish ----
+    // State stays 'drafted', so a later run without this flag reuses the same draft and publishes it.
     if (opts.draftsOnly) {
       st.title = article.title;
       st.updatedAt = new Date().toISOString();
       if (!save()) return 1;
-      dim(`  ✔ ${article.no} 草稿已就绪(未发布): https://juejin.cn/editor/drafts/${draftId}`);
+      dim(`  ✔ ${article.no} draft ready (not published): https://juejin.cn/editor/drafts/${draftId}`);
       info('');
       drafted++;
       if (delayMs > 0 && article !== selected[selected.length - 1]) await delay(delayMs);
       continue;
     }
 
-    // ---- 发布 ----
     const outcome = await doPublish(state, article.no, draftId, options, hooks, interactive, save);
     if (outcome === 'ok') {
-      // 记下这次发布的标题,`--rename` 靠它判断是否已改成目标标题
+      // Record the published title; `--rename` uses it to tell whether the target title is live
       st.title = article.title;
       if (!save()) return 1;
       if (st.needsCheck) {
-        dim('  ! 发布成功但没拿到文章 id,请到创作中心确认');
+        dim('  ! Publish succeeded but no article id was returned, please confirm in the creator center');
       } else {
         info(`  ${st.url}`);
       }
       processed++;
     } else if (outcome === 'failed') {
-      dim('  状态已保留,修好后可用相同命令重跑续发。');
+      dim('  State has been kept; once fixed, re-run the same command to continue publishing.');
       return 1;
     } else {
-      dim('  因为「是否已发布不可知」,脚本不会自动重发。');
-      dim('  确认未发布后用 --republish ' + article.no + ' 重发。');
+      dim('  Because "whether it was published is unknown", the script will not auto-resend.');
+      dim('  Once you confirm it was not published, re-publish with --republish ' + article.no + '.');
       return 1;
     }
     info('');
@@ -1112,23 +1060,22 @@ async function runPublish(
     }
   }
 
-  header(opts.dryRun ? 'dry-run 结束(没有发送任何请求)' : '完成');
+  header(opts.dryRun ? 'dry-run finished (no requests were sent)' : 'Done');
   if (opts.dryRun) {
-    info(`  校验通过、将要发布的: ${planned} 篇`);
+    info(`  Validated and to be published: ${planned} articles`);
   } else if (opts.draftsOnly) {
-    info(`  本次新建草稿 ${drafted} 篇(均未发布)`);
+    info(`  New drafts created this run: ${drafted} (none published)`);
     const total = Object.values(state.articles).filter((s) => s.status === 'drafted').length;
-    info(`  状态文件累计待发布草稿 ${total} 篇`);
+    info(`  Total drafts pending publication in the state file: ${total}`);
     info('');
-    info('  要发布它们:到掘金创作中心的草稿箱逐篇点发布,或去掉 --drafts-only 重跑本命令。');
-    info('  (草稿已存在,重跑会复用,不会重复建草稿)');
+    info('  To publish them: go to the draft box in the Juejin creator center and publish them one by one, or re-run this command without --drafts-only.');
+    info('  (drafts already exist; re-running reuses them and does not create duplicates)');
   } else {
-    info(`  本次发布 ${processed} 篇`);
+    info(`  Published this run: ${processed} articles`);
     const total = Object.values(state.articles).filter((s) => s.status === 'published').length;
-    info(`  状态文件累计已发布 ${total} 篇`);
+    info(`  Total published in the state file: ${total}`);
   }
   return 0;
 }
 
-// 入口在 src/publish/publish.ts —— 这里只导出 run(argv),不再自己执行。
-// SIGINT 处理也统一放在那边,免得两个平台各注册一次。
+// Entry point is src/publish/publish.ts — this file only exports run(argv); SIGINT handling lives there too.

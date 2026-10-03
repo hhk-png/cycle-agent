@@ -5,9 +5,9 @@ import type { ClaudeResult, ClaudeHooks } from '../shared/types.ts';
 let activeChild: ReturnType<typeof spawn> | null = null;
 
 /**
- * 中断时结束当前正在运行的 claude 子进程。
- * Windows 上 claude 经 cmd.exe 包装启动,`child.kill()` 只会杀掉 cmd 壳,
- * 真正的 claude(node)进程会残留在后台,所以用 `taskkill /T` 结束整棵进程树。
+ * On interruption, terminate the running claude subprocess. Windows wraps claude in cmd.exe, so
+ * `child.kill()` only kills the shell and the real claude (node) process lingers — hence `taskkill /T`
+ * to kill the whole tree.
  */
 export function killActiveClaude(): void {
   const child = activeChild;
@@ -17,20 +17,17 @@ export function killActiveClaude(): void {
 
   if (process.platform === 'win32') {
     try {
-      // /T 连带子进程一起结束,/F 强制
+      // /T terminates child processes too, /F forces it
       spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
     } catch {
-      child.kill(); // taskkill 不可用时的兜底
+      child.kill(); // Fallback if taskkill is unavailable
     }
   } else {
     child.kill();
   }
 }
 
-/**
- * 通过 stdin 把 prompt 喂给 `claude -p`,缓冲 stdout/stderr。
- * 返回子进程退出码与捕获的输出。
- */
+/** Feed the prompt to `claude -p` via stdin; resolve with exit code and buffered output */
 export function runClaude(
   args: string[],
   prompt: string,
@@ -55,13 +52,13 @@ export function runClaude(
       hooks.onStderr?.(text);
     });
 
-    // spawn 失败也走 resolve
+    // Even a spawn failure goes through resolve
     child.on('error', (err: Error) => {
       activeChild = null;
       const code = (err as NodeJS.ErrnoException).code;
       const msg =
         code === 'ENOENT'
-          ? '未找到 claude 命令，请确认已安装并登录 Claude Code（npm i -g @anthropic-ai/claude-code）'
+          ? 'claude command not found; please make sure Claude Code is installed and logged in (npm i -g @anthropic-ai/claude-code)'
           : err.message;
       resolve({ exitCode: 1, stdout: '', stderr: msg });
     });
