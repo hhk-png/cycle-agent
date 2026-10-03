@@ -15,7 +15,7 @@ import { isTTY } from '../shared/ui.ts';
  * 也不需要在扫描时按前缀过滤掉对方的东西。
  *
  * ⚠️ 本模块必须**无副作用** —— 配置文件要 `import type { PublishConfig }` 从这里取类型。
- * 若把类型定义在入口 src/publish/juejin.ts,导入它会连带执行入口的 main() 和 SIGINT 注册,
+ * 若把类型定义在入口 src/publish/juejin.ts(经 publish.ts 派发),导入它会连带执行入口的 main() 和 SIGINT 注册,
  * 用户只想读个类型结果开始发文章。这也是 TutorialConfig 住在 config.ts 而非 run.ts 的原因。
  */
 
@@ -32,6 +32,12 @@ export interface PublishConfig {
    * 省略时按 'h1'。掘金上前几章用的是文件名形式,`--rename` 也按它对齐。
    */
   titleSource?: TitleSource;
+  /**
+   * 只在 `titleSource: 'fileName'` 时生效:给标题补的系列名前缀。
+   * 用于源文件名本身没有系列前缀的教程(ai-agent-toturial 的文件叫 `00-前言与导读`,
+   * 配上 `'ai-agent教程-'` 就成了 `ai-agent教程-00-前言与导读`)。
+   */
+  titlePrefix?: string;
   /** 掘金分类 id(用 --categories 查真实值) */
   categoryId: string;
   /** 掘金标签 id 列表(**最多 3 个**,服务端实测限制;用 --tags <关键词> 查真实值) */
@@ -53,7 +59,7 @@ export const publishConfigsDir = path.resolve(process.cwd(), 'src', 'publish', '
  *
  * 掘金与微信两种配置同住 src/publish/configs/(同一个教程的两个平台是一件事,
  * 分目录反而难找),但**类型不同、归各自的入口管**:掘金侧的 pickPublishConfig
- * 一旦把微信配置也算进来,`node src/publish/juejin.ts` 就会从「只有一个配置时直用」
+ * 一旦把微信配置也算进来,`publish.ts juejin` 就会从「只有一个配置时直用」
  * 变成「有多个配置,请显式指定」—— 平白把已有的用法弄坏。所以两边各按前缀过滤。
  */
 export const WECHAT_CONFIG_PREFIX = 'wechat-';

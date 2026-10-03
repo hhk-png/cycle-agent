@@ -26,6 +26,8 @@ export interface WechatConfig {
   fromNumber: number;
   /** 标题取原文 H1 还是文件名;省略按 'h1' */
   titleSource?: TitleSource;
+  /** 只在 `titleSource: 'fileName'` 时生效:给标题补的系列名前缀(见 PublishConfig.titlePrefix) */
+  titlePrefix?: string;
 
   /** 公众号 AppID(不是密码,可以明文) */
   appId: string;

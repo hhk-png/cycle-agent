@@ -32,20 +32,27 @@ import {
   stateFileName,
   type PublishState,
 } from './publish-state.ts';
-import { dim, error, header, info, isTTY, startSpinner, stopSpinnerActive, success } from '../shared/ui.ts';
+import { dim, error, header, info, isTTY, startSpinner, success } from '../shared/ui.ts';
 
 /**
  * 把教程文章发布到掘金。
  *
  * 用法:
- *   node src/publish/juejin.ts --list              # 列待发文章 + 标题 + 摘要字数(预校验)
- *   node src/publish/juejin.ts --categories        # 查掘金真实分类 id
- *   node src/publish/juejin.ts --tags vllm         # 按关键词查标签 id
- *   node src/publish/juejin.ts --suggest-briefs    # 打印摘要素材(只打印,不改文件)
- *   node src/publish/juejin.ts --dry-run           # 只打印不发送
- *   node src/publish/juejin.ts                     # 发布(建第 1 篇草稿后暂停等你确认)
- *   node src/publish/juejin.ts --yes               # 跳过确认,一次发完
- *   node src/publish/juejin.ts --rename            # 把已发布文章的标题改成当前 titleSource 的写法
+ *   node src/publish/publish.ts juejin --list              # 列待发文章 + 标题 + 摘要字数(预校验)
+ *   node src/publish/publish.ts juejin --categories        # 查掘金真实分类 id
+ *   node src/publish/publish.ts juejin --tags vllm         # 按关键词查标签 id
+ *   node src/publish/publish.ts juejin --suggest-briefs    # 打印摘要素材(只打印,不改文件)
+ *   node src/publish/publish.ts juejin --dry-run           # 只打印不发送
+ *   node src/publish/publish.ts juejin                     # 发布(建第 1 篇草稿后暂停等你确认)
+ *   node src/publish/publish.ts juejin --yes               # 跳过确认,一次发完
+ *   node src/publish/publish.ts juejin --drafts-only       # 只建草稿,不发布(草稿私有,不公开)
+ *   node src/publish/publish.ts juejin --from 0 --to 4     # 只处理编号落在区间内的篇目
+ *   node src/publish/publish.ts juejin --sync              # 把已有草稿对齐到配置里的标题与摘要
+ *                                                  #  (改了 briefs/titleSource 之后跑它,否则草稿不会更新)
+ *                                                  # 未发布的只改草稿;已发布的改完就地重新发布
+ *
+ * `--drafts-only` 与「发布」共用同一套状态与草稿:只建过草稿的篇目,
+ * 之后去掉这个开关重跑,会**复用同一份草稿**直接发布,不会重复建。
  *
  * 退出码:
  *   0   本次待发列表全部处理完
@@ -74,13 +81,16 @@ interface CliOptions {
   tags: string | null;
   suggestBriefs: boolean;
   dryRun: boolean;
+  draftsOnly: boolean;
   yes: boolean;
   only: string | null;
   from: string | null;
+  to: string | null;
   delayMs: number | null;
   orphans: boolean;
   republish: string | null;
-  rename: boolean;
+  /** `--sync`(旧名 `--rename`):把草稿对齐到本地配置的标题与摘要 */
+  sync: boolean;
   force: boolean;
   skipBriefCheck: boolean;
   skipBodyCheck: boolean;
@@ -95,13 +105,15 @@ function defaultOptions(): CliOptions {
     tags: null,
     suggestBriefs: false,
     dryRun: false,
+    draftsOnly: false,
     yes: false,
     only: null,
     from: null,
+    to: null,
     delayMs: null,
     orphans: false,
     republish: null,
-    rename: false,
+    sync: false,
     force: false,
     skipBriefCheck: false,
     skipBodyCheck: false,
@@ -124,9 +136,11 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
       case '--categories': o.categories = true; break;
       case '--suggest-briefs': o.suggestBriefs = true; break;
       case '--dry-run': o.dryRun = true; break;
+      case '--drafts-only': o.draftsOnly = true; break;
       case '--yes': case '-y': o.yes = true; break;
       case '--orphans': o.orphans = true; break;
-      case '--rename': o.rename = true; break;
+      // `--rename` 是旧名,保留作别名(它当时只管标题,现在管标题+摘要)
+      case '--sync': case '--rename': o.sync = true; break;
       case '--force': o.force = true; break;
       case '--skip-brief-check': o.skipBriefCheck = true; break;
       case '--skip-body-check': o.skipBodyCheck = true; break;
@@ -147,6 +161,12 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
         const v = needValue();
         if (v === null) return { error: '--from 需要一个编号,如 --from 15' };
         o.from = v;
+        break;
+      }
+      case '--to': {
+        const v = needValue();
+        if (v === null) return { error: '--to 需要一个编号,如 --to 04' };
+        o.to = v;
         break;
       }
       case '--republish': {
@@ -270,7 +290,7 @@ function checkBriefs(cfg: PublishConfig, articles: Article[], skip: boolean): st
   return problems;
 }
 
-/** 按 --only / --from 收窄待发范围 */
+/** 按 --only / --from / --to 收窄待发范围 */
 function selectArticles(articles: Article[], opts: CliOptions): Article[] {
   let list = articles;
   if (opts.only) {
@@ -280,6 +300,10 @@ function selectArticles(articles: Article[], opts: CliOptions): Article[] {
   if (opts.from) {
     const from = Number(opts.from);
     list = list.filter((a) => a.order >= from);
+  }
+  if (opts.to) {
+    const to = Number(opts.to);
+    list = list.filter((a) => a.order <= to);
   }
   return list;
 }
@@ -476,6 +500,9 @@ async function readBackCover(
 
 /**
  * 确认点:第 1 篇草稿建好后暂停,让你去编辑器里设封面 + 看排版。
+ *
+ * `draftsOnly` 只改提示语 —— 建草稿之前的那次停顿在两种模式下都值得有,
+ * 因为排版是「发布出去就改不动」的东西,而建草稿是免费的(不公开)。
  */
 async function runGate(
   state: PublishState,
@@ -485,8 +512,11 @@ async function runGate(
   options: juejin.JuejinOptions,
   hooks: juejin.JuejinHooks,
   save: () => boolean,
+  draftsOnly: boolean,
 ): Promise<'continue' | 'pause'> {
   const draftUrl = `https://juejin.cn/editor/drafts/${draftId}`;
+  const resumeCmd = `node src/publish/publish.ts juejin${draftsOnly ? ' --drafts-only' : ''} --yes`;
+  const whatNext = draftsOnly ? '继续建草稿' : '继续发布';
   info('');
   header('已建好第 1 篇草稿,请人工确认');
   info(`  草稿地址: ${draftUrl}`);
@@ -499,29 +529,29 @@ async function runGate(
   const interactive = isTTY();
   if (!interactive) {
     // 非 TTY:不猜、不阻塞。草稿已建好(无公开副作用),状态已落盘
-    info(`  确认排版无误后运行: node src/publish/juejin.ts --yes`);
+    info(`  确认排版无误后运行: ${resumeCmd}`);
     info(`  (会复用已建好的草稿,不会重复建草稿)`);
     return 'pause';
   }
 
   const ans = await confirm({
-    message: `确认排版与封面无误后继续发布这篇及剩余 ${remaining} 篇?`,
+    message: `确认排版与封面无误后${whatNext}这篇及剩余 ${remaining} 篇?`,
   });
   if (typeof ans !== 'boolean') process.exit(130);
   if (!ans) {
     info('');
-    info(`已暂停。确认无误后运行: node src/publish/juejin.ts --yes`);
+    info(`已暂停。确认无误后运行: ${resumeCmd}`);
     info(`草稿 id 已保存(${draftId}),重跑会复用它,不会重复建草稿。`);
     return 'pause';
   }
   return 'continue';
 }
 
-async function main(): Promise<number> {
-  const parsed = parseArgs(process.argv.slice(2));
+export async function run(argv: string[]): Promise<number> {
+  const parsed = parseArgs(argv);
   if ('error' in parsed) {
     error(parsed.error);
-    error('用法: node src/publish/juejin.ts [配置名] [--list|--dry-run|--yes|--only NN|--from NN|...]');
+    error('用法: node src/publish/publish.ts juejin [配置名] [--list|--dry-run|--yes|--only NN|--from NN|...]');
     return 1;
   }
   const opts = parsed;
@@ -534,7 +564,13 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const loaded = loadArticles(cfg.sourceDir, cfg.filePrefix, cfg.fromNumber, cfg.titleSource ?? 'h1');
+  const loaded = loadArticles(
+    cfg.sourceDir,
+    cfg.filePrefix,
+    cfg.fromNumber,
+    cfg.titleSource ?? 'h1',
+    cfg.titlePrefix ?? '',
+  );
   if ('error' in loaded) {
     error(loaded.error);
     return 1;
@@ -613,7 +649,7 @@ async function main(): Promise<number> {
   }
 
   try {
-    if (opts.rename) return await runRename(cfg, state, all, opts, options, hooks, stateFile);
+    if (opts.sync) return await runSync(cfg, state, all, opts, options, hooks, stateFile);
     return await runPublish(cfg, state, all, opts, options, hooks, stateFile);
   } finally {
     releaseLock(stateFile);
@@ -621,20 +657,27 @@ async function main(): Promise<number> {
 }
 
 /**
- * 就地改已发布文章的标题(`--rename`)。
+ * 把**本地配置**与**掘金上已有的草稿**对齐(`--sync`,旧名 `--rename`)。
  *
- * 掘金的模型里已发布文章仍挂着一份草稿(detail 的 `article_id` 非 0),所以
- * 「改标题」= 改草稿 + 重新 publish。实测 publish 是**就地更新**:article_id 不变、
- * 链接不变、阅读量等数据保留,只是标题换了。
+ * 为什么需要它:标题和摘要都会在配置里被改,而草稿一旦建好就冻在那儿 ——
+ * 建草稿时的正文哈希只覆盖「标题+正文」,摘要改了哈希不变,于是重跑 `--publish`
+ * 会认为「草稿已是最新」而静默跳过,改了的摘要永远推不上去。`--sync` 就是补这条路。
  *
- * ⚠️ 本命令**只动标题**。`article_draft/update` 必须带全字段(只传 title 有把正文
- * 清空的风险),所以正文/摘要/分类/标签/封面一律沿用**远端草稿里读回来的值**原样传回;
- * 只有远端字段为空时才退回本地值。改标题就不该顺手改动别的东西。
+ * 它能处理的两种状态:
+ *   · `drafted`  —— 就地改草稿,不发布(草稿仍是私有的)
+ *   · `published`—— 改草稿 + 重新 publish。实测 publish 是**就地更新**:article_id
+ *                   不变、链接不变、阅读量等数据保留,只是内容换了。
  *
- * 安全阀:改完先**回读草稿**确认标题生效、且正文长度没变,才重新发布。
- * 正文被误改时就停住不发 —— 已公开文章的正文被删是不可逆的。
+ * ⚠️ `article_draft/update` 必须带全字段(只传 title 有把正文清空的风险),所以:
+ *   · 标题、摘要 —— 取本地配置的当前值(这正是要同步的东西)
+ *   · 正文 —— **只在源文件真的改过时**才换(`contentHash` 变了才动),否则原样传回
+ *     远端读到的那份。不碰没打算碰的东西。
+ *   · 分类/标签/封面 —— 优先用远端已有的值
+ *
+ * 安全阀:改完先**回读草稿**确认标题与摘要生效、且正文长度没变,才继续。
+ * 正文被误改时就停住 —— 已公开文章的正文被删是不可逆的。
  */
-async function runRename(
+async function runSync(
   cfg: PublishConfig,
   state: PublishState,
   all: Article[],
@@ -658,26 +701,26 @@ async function runRename(
     return 1;
   }
 
-  // ---- 预检:全量报出不能改的,一篇都不动 ----
+  // ---- 预检:全量报出不能同步的,一篇都不动 ----
   const problems: string[] = [];
   for (const a of selected) {
     const st = state.articles[a.no];
     if (!st) problems.push(`${a.no} 状态文件里没有记录`);
-    else if (st.status !== 'published') problems.push(`${a.no} 状态是 ${st.status},不是已发布`);
-    else if (!st.draftId) problems.push(`${a.no} 没有记录草稿 id,无法改标题`);
+    else if (st.status === 'pending') problems.push(`${a.no} 还没建过草稿,先跑 --drafts-only`);
+    else if (!st.draftId) problems.push(`${a.no} 没有记录草稿 id,无法同步`);
   }
   if (problems.length > 0) {
-    error(`有 ${problems.length} 篇不能改标题,本次一篇都不会动:`);
+    error(`有 ${problems.length} 篇不能同步,本次一篇都不会动:`);
     problems.forEach((p) => error(`  · ${p}`));
     return 1;
   }
 
   const delayMs = opts.delayMs ?? cfg.delayMs;
   const interactive = isTTY();
-  header(`改标题 ${cfg.sourceDir} → 掘金`);
+  header(`同步草稿 ${cfg.sourceDir} → 掘金`);
   dim(
     `  标题来源: ${cfg.titleSource === 'fileName' ? '文件名(−.md)' : '原文 H1'} · ` +
-      `待处理 ${selected.length} 篇 · ${opts.dryRun ? 'dry-run' : '实际修改并重新发布'}`,
+      `待处理 ${selected.length} 篇 · ${opts.dryRun ? 'dry-run' : '对齐标题与摘要,已发布的重新发布'}`,
   );
   info('');
 
@@ -696,7 +739,7 @@ async function runRename(
     }
   }
 
-  let renamed = 0;
+  let synced = 0;
   let skipped = 0;
 
   for (const article of selected) {
@@ -704,21 +747,32 @@ async function runRename(
     // 读不到就当未知(例如文章数超过一页),此时按本地记录走,不能当成「不匹配」
     const live = st.articleId ? liveTitles.get(st.articleId) : undefined;
 
-    // 本地记着改过、线上也是目标标题(或线上读不到)→ 完成态,不再碰(幂等)
-    if (st.title === article.title && (live === undefined || live === article.title)) {
-      dim(`✓ ${article.no} 已是「${article.title}」,跳过`);
+    const wantBrief = cfg.briefs[article.no]?.trim() ?? '';
+    const titleSame = st.title === article.title;
+    // 老状态文件没有 brief 字段 → undefined ≠ wantBrief → 会走一次全量刷新,正是想要的
+    const briefSame = st.brief === wantBrief;
+    const bodySame = st.contentHash === article.contentHash;
+
+    // 三样都对齐、线上标题也对(或读不到)→ 完成态,不再碰(幂等)
+    if (titleSame && briefSame && bodySame && (live === undefined || live === article.title)) {
+      dim(`✓ ${article.no} 标题、摘要、正文都已是目标值,跳过`);
       skipped++;
       continue;
     }
-    if (st.title === article.title && live !== article.title) {
+    if (titleSame && live !== undefined && live !== article.title) {
       // 上次改完草稿也发过,但掘金的异步同步没生效 —— 草稿已是目标标题,
       // 下面自然会走「只补发布」那条路,不会重复改草稿
       dim(`  ! ${article.no} 线上标题仍是「${live}」,补发布一次`);
     }
 
     if (opts.dryRun) {
-      info(`${article.no}  ${st.title ?? '(未知/未记录)'}  →  ${article.title}`);
-      renamed++;
+      const bits: string[] = [];
+      if (!titleSame) bits.push(`标题「${st.title ?? '(未记录)'}」→「${article.title}」`);
+      if (!briefSame) bits.push(st.brief === undefined ? '摘要(首次记录)' : '摘要');
+      if (!bodySame) bits.push('正文');
+      if (bits.length === 0) bits.push('仅补发布');
+      info(`${article.no}  ${bits.join(' · ')}`);
+      synced++;
       continue;
     }
 
@@ -735,21 +789,24 @@ async function runRename(
     const remote = detail.data;
     sp?.stopSuccess(`✔ ${article.no} ${remote.title || '(无标题)'}`);
 
-    // 远端已是目标标题,但状态里没记成功过 —— 说明上次改完草稿就中断了,
+    // 远端已是目标值,但状态里没记成功过 —— 说明上次改完草稿就中断了,
     // 不能当作「已完成」跳过,补一次发布即可(不必再改一遍草稿)
-    const needUpdate = remote.title !== article.title;
+    const needUpdate = remote.title !== article.title || remote.briefContent.trim() !== wantBrief;
 
     if (needUpdate) {
+      // 正文只在**源文件真的改过**时才换。远端读回来的 markdown 可能被掘金规范化过,
+      // 拿它跟本地逐字比会永远「不一致」,于是每次都重写正文 —— 那是不该有的副作用。
+      const contentChanged = st.contentHash !== article.contentHash;
       const sp2 = interactive ? startSpinner(`${article.no} · 改草稿`) : null;
       const upd = await juejin.updateDraft(
         {
           draftId,
           title: article.title,
-          briefContent: remote.briefContent.trim() || (cfg.briefs[article.no]?.trim() ?? ''),
-          markContent: remote.markContent.trim() ? remote.markContent : article.content,
+          briefContent: wantBrief,
+          markContent: contentChanged ? article.content : remote.markContent,
           categoryId: cfg.categoryId,
           tagIds: cfg.tagIds,
-          coverImage: remote.coverImage,
+          coverImage: remote.coverImage || state.coverImage,
         },
         options,
         hooks,
@@ -763,29 +820,49 @@ async function runRename(
       }
       sp2?.stopSuccess(`✔ ${article.no} 草稿已改`);
 
-      // ---- 安全阀:回读确认标题生效、正文没被误伤 ----
+      // ---- 安全阀:回读确认标题与摘要生效、正文没被误伤 ----
       const after = await juejin.getDraft(draftId, options, hooks);
       if (after.ok && after.data) {
         if (after.data.title !== article.title) {
           error(`✖ ${article.no} 回读标题仍是「${after.data.title}」,改标题没生效,已停住没有重新发布。`);
           return 1;
         }
-        if (after.data.markContent.length !== remote.markContent.length) {
+        if (after.data.briefContent.trim() !== wantBrief) {
+          error(`✖ ${article.no} 回读摘要与目标值不一致,已停住没有重新发布(草稿 id ${draftId})。`);
+          return 1;
+        }
+        if (after.data.markContent.length !== remote.markContent.length && !contentChanged) {
           error(
-            `✖ ${article.no} 改标题顺手改动了正文(远端 ${remote.markContent.length} → ` +
+            `✖ ${article.no} 同步标题/摘要时顺手改动了正文(远端 ${remote.markContent.length} → ` +
               `${after.data.markContent.length} 字符),已停住没有重新发布。\n` +
               `  草稿 id ${draftId},线上文章没有受影响。`,
           );
           return 1;
         }
       } else {
-        dim('  ! 回读草稿失败,跳过校验(草稿已是新标题)');
+        dim('  ! 回读草稿失败,跳过校验(草稿已按目标值提交)');
       }
     } else {
-      dim(`  ${article.no} 草稿标题已是目标值,只需重新发布`);
+      dim(`  ${article.no} 草稿已是目标值,只需补一次发布`);
     }
 
-    // ---- 重新发布(就地更新,article_id 不变) ----
+    // 草稿这一侧已经对齐 —— 先把状态记上,后面的发布无论成败都不会重复改草稿
+    st.title = article.title;
+    st.brief = wantBrief;
+    st.contentHash = article.contentHash;
+    st.updatedAt = new Date().toISOString();
+    if (!save()) return 1;
+
+    // ---- 未发布的草稿:到此为止,不发布 ----
+    if (st.status !== 'published') {
+      dim(`  ✔ ${article.no} 草稿已同步(未发布): https://juejin.cn/editor/drafts/${draftId}`);
+      info('');
+      synced++;
+      if (delayMs > 0 && article !== selected[selected.length - 1]) await delay(delayMs);
+      continue;
+    }
+
+    // ---- 已发布:重新发布(就地更新,article_id 不变) ----
     const sp3 = interactive ? startSpinner(`${article.no} · 重新发布`) : null;
     const pub = await juejin.publishArticle(draftId, options, hooks);
     if (!pub.ok) {
@@ -795,14 +872,13 @@ async function runRename(
       save();
       error(`✖ ${article.no} 重新发布失败: ${pub.errMsg}`);
       if (pub.raw) dim(`  响应: ${pub.raw.slice(0, 300)}`);
-      dim('  草稿已是新标题但线上还是旧标题。确认后用 --rename 重跑,会跳过改草稿、只补发布。');
+      dim('  草稿已是新内容但线上还是旧的。确认后用 --sync 重跑,会跳过改草稿、只补发布。');
       return 1;
     }
 
     const articleId = pub.data?.articleId ?? st.articleId;
     st.articleId = articleId;
     st.url = articleId ? `https://juejin.cn/post/${articleId}` : st.url;
-    st.title = article.title;
     st.publishAttemptedAt = null;
     st.updatedAt = new Date().toISOString();
     if (!save()) return 1;
@@ -810,7 +886,7 @@ async function runRename(
     sp3?.stopSuccess(`✔ ${article.no} → ${article.title}`);
     if (st.url) info(`  ${st.url}`);
     info('');
-    renamed++;
+    synced++;
 
     if (delayMs > 0 && article !== selected[selected.length - 1]) {
       await delay(delayMs);
@@ -819,18 +895,18 @@ async function runRename(
 
   header(opts.dryRun ? 'dry-run 结束(没有发送任何请求)' : '完成');
   if (opts.dryRun) {
-    info(`  将要改标题: ${renamed} 篇`);
-    dim('  dry-run 不联网,这里按本地记录判断;实际运行时还会比对线上文章标题。');
+    info(`  将要同步: ${synced} 篇`);
+    dim('  dry-run 不联网,这里按本地记录判断;实际运行时还会读草稿逐篇比对。');
     return 0;
   }
 
-  info(`  本次改标题并重新发布: ${renamed} 篇 · 跳过(已是目标标题): ${skipped} 篇`);
+  info(`  本次同步: ${synced} 篇 · 跳过(已是目标值): ${skipped} 篇`);
 
   // 刻意**不**在这里回读线上标题来判断成败:同步是异步的,刚发完几乎必然还没变过来,
   // 回读只会得到「全都没生效」的假警报。真正可靠的判断在下次运行的开头。
-  if (renamed > 0) {
+  if (synced > 0) {
     dim('  掘金把草稿标题同步到线上文章记录是异步的 —— 快的几分钟,慢的要再发一次才生效。');
-    dim('  过几分钟再跑一次 --rename 核对:线上标题还没变的会被重新补发布(幂等),已生效的跳过。');
+    dim('  过几分钟再跑一次 --sync 核对:线上标题还没变的会被重新补发布(幂等),已生效的跳过。');
   }
   return 0;
 }
@@ -893,10 +969,14 @@ async function runPublish(
   const interactive = isTTY();
   const delayMs = opts.delayMs ?? cfg.delayMs;
 
-  header(`发布 ${cfg.sourceDir} → 掘金`);
-  dim(`  待处理 ${selected.length} 篇 · 篇间隔 ${delayMs}ms · ${opts.dryRun ? 'dry-run' : '实际发布'}`);
-  if (!opts.dryRun) {
+  const mode = opts.dryRun ? 'dry-run' : opts.draftsOnly ? '只建草稿(不发布)' : '实际发布';
+  header(`${opts.draftsOnly ? '建草稿' : '发布'} ${cfg.sourceDir} → 掘金`);
+  dim(`  待处理 ${selected.length} 篇 · 篇间隔 ${delayMs}ms · ${mode}`);
+  if (!opts.dryRun && !opts.draftsOnly) {
     dim('  提示:一次性连发多篇可能触发掘金风控,被拦时可用 --delay 调大间隔后重跑。');
+  }
+  if (opts.draftsOnly) {
+    dim('  草稿是私有的,不公开 —— 发不发、什么时候发,由你在掘金后台逐篇决定。');
   }
   info('');
 
@@ -904,6 +984,7 @@ async function runPublish(
   /** --yes 路径下,封面读回最多尝试一次(失败了不必每篇都重试) */
   let coverChecked = false;
   let processed = 0;
+  let drafted = 0;
   let planned = 0;
 
   for (const article of selected) {
@@ -959,6 +1040,7 @@ async function runPublish(
       st.draftId = draftId;
       st.status = 'drafted';
       st.contentHash = article.contentHash;
+      st.brief = cfg.briefs[article.no]?.trim() ?? '';
       st.updatedAt = new Date().toISOString();
       // 立刻落盘:即使后面发布失败或 Ctrl-C,草稿 id 也不会丢
       if (!save()) return 1;
@@ -971,7 +1053,7 @@ async function runPublish(
     if (!gatePassed) {
       gatePassed = true;
       const remaining = selected.filter((x) => x.order > article.order).length;
-      const gate = await runGate(state, draftId, article, remaining, options, hooks, save);
+      const gate = await runGate(state, draftId, article, remaining, options, hooks, save, opts.draftsOnly);
       if (gate === 'pause') return EXIT_PAUSED;
     } else if (!coverChecked && !state.coverImage) {
       // --yes 跳过了确认门,但封面读回不能跟着跳过(见 readBackCover 的注释)
@@ -987,6 +1069,20 @@ async function runPublish(
         error('  已停住,没有发布。确认无误后可用 --skip-body-check 跳过本校验。');
         return 1;
       }
+    }
+
+    // ---- 只建草稿模式:到此为止,绝不调发布接口 ----
+    // 状态停在 'drafted'(草稿已建待发布),正是这个模式该有的终态:
+    // 下次不带 --drafts-only 重跑会复用同一份草稿直接发布,不会重复建。
+    if (opts.draftsOnly) {
+      st.title = article.title;
+      st.updatedAt = new Date().toISOString();
+      if (!save()) return 1;
+      dim(`  ✔ ${article.no} 草稿已就绪(未发布): https://juejin.cn/editor/drafts/${draftId}`);
+      info('');
+      drafted++;
+      if (delayMs > 0 && article !== selected[selected.length - 1]) await delay(delayMs);
+      continue;
     }
 
     // ---- 发布 ----
@@ -1019,6 +1115,13 @@ async function runPublish(
   header(opts.dryRun ? 'dry-run 结束(没有发送任何请求)' : '完成');
   if (opts.dryRun) {
     info(`  校验通过、将要发布的: ${planned} 篇`);
+  } else if (opts.draftsOnly) {
+    info(`  本次新建草稿 ${drafted} 篇(均未发布)`);
+    const total = Object.values(state.articles).filter((s) => s.status === 'drafted').length;
+    info(`  状态文件累计待发布草稿 ${total} 篇`);
+    info('');
+    info('  要发布它们:到掘金创作中心的草稿箱逐篇点发布,或去掉 --drafts-only 重跑本命令。');
+    info('  (草稿已存在,重跑会复用,不会重复建草稿)');
   } else {
     info(`  本次发布 ${processed} 篇`);
     const total = Object.values(state.articles).filter((s) => s.status === 'published').length;
@@ -1027,19 +1130,5 @@ async function runPublish(
   return 0;
 }
 
-process.on('SIGINT', () => {
-  stopSpinnerActive();
-  console.log(pc.red('✖ 已中断'));
-  // 不在信号处理器里写状态文件(写盘竞态)。
-  // 靠「每完成一步即落盘」保证可续跑:最多损失一篇进度,最坏留一个孤儿草稿(不公开)。
-  process.exit(130);
-});
-
-main()
-  .then((code) => {
-    process.exitCode = code;
-  })
-  .catch((err: unknown) => {
-    error(`未预期的错误: ${(err as Error).message}`);
-    process.exitCode = 1;
-  });
+// 入口在 src/publish/publish.ts —— 这里只导出 run(argv),不再自己执行。
+// SIGINT 处理也统一放在那边,免得两个平台各注册一次。

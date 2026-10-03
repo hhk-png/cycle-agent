@@ -127,10 +127,18 @@ interface SourceFile {
   text: string;
 }
 
-/** 扫目录,收集 <前缀>-<编号>-<标题>.md 形式的文件 */
+/**
+ * 扫目录,收集 `<前缀>-<编号>-<标题>.md` 形式的文件。
+ *
+ * `filePrefix` 允许为空 —— ai-agent-toturial 的文件就叫 `00-前言与导读.md`,
+ * 没有系列前缀。此前缀为空时退化成 `^<编号>-<标题>.md$`,并且**只**扫顶层目录
+ * (mini-agent/README.md 这种子目录里的文件本来也匹配不上)。
+ */
 function scanSourceDir(dir: string, filePrefix: string): { files: SourceFile[] } | { error: string } {
   if (!existsSync(dir)) return { error: `源目录不存在: ${dir}` };
-  const re = new RegExp(`^${escapeRegExp(filePrefix)}-(\\d+)-.+\\.md$`);
+  const re = filePrefix
+    ? new RegExp(`^${escapeRegExp(filePrefix)}-(\\d+)-.+\\.md$`)
+    : new RegExp(`^(\\d+)-.+\\.md$`);
   const files: SourceFile[] = [];
   for (const fileName of readdirSync(dir)) {
     const m = re.exec(fileName);
@@ -143,7 +151,7 @@ function scanSourceDir(dir: string, filePrefix: string): { files: SourceFile[] }
     });
   }
   if (files.length === 0) {
-    return { error: `${dir} 下没有匹配 ${filePrefix}-<编号>-*.md 的文件` };
+    return { error: `${dir} 下没有匹配 ${filePrefix ? `${filePrefix}-` : ''}<编号>-*.md 的文件` };
   }
   return { files };
 }
@@ -161,12 +169,18 @@ export type TitleSource = 'h1' | 'fileName';
 /**
  * 载入编号 >= fromNumber 的全部文章,按编号数值升序。
  * 编号有重复(同名编号两个文件)时直接报错 —— 那会让幂等状态串台。
+ *
+ * `titlePrefix` 只在 `titleSource: 'fileName'` 时起作用,用来给标题补一个
+ * 系列名前缀。给 ai-agent-toturial 用:它的文件名是 `00-前言与导读`,
+ * 补成 `ai-agent教程-00-前言与导读`,与已发的 `vllm教程-XX`/`ray教程-XX` 排成一套。
+ * 之所以加这一项而不是改文件名:README 里 23 条章节链接按文件名写死,改名会全部失效。
  */
 export function loadArticles(
   sourceDir: string,
   filePrefix: string,
   fromNumber: number,
   titleSource: TitleSource = 'h1',
+  titlePrefix = '',
 ): { articles: Article[] } | { error: string } {
   const scanned = scanSourceDir(sourceDir, filePrefix);
   if ('error' in scanned) return scanned;
@@ -203,7 +217,7 @@ export function loadArticles(
     if (idx < 0) return { error: `${f.fileName} 找不到一级标题(# )` };
     const h1Title = lines[idx].replace(/^# /, '').trim();
     const fileNameTitle = f.fileName.replace(/\.md$/, '');
-    const title = titleSource === 'fileName' ? fileNameTitle : h1Title;
+    const title = titleSource === 'fileName' ? `${titlePrefix}${fileNameTitle}` : h1Title;
 
     // 只删「标题行 + 紧随的一个空行」,绝不全局压缩空行 —— 那会改动代码块内的内容
     const kept = lines.slice();

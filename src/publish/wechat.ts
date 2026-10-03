@@ -13,7 +13,7 @@ import {
   stateFileName,
   type PublishState,
 } from './publish-state.ts';
-import { dim, error, header, info, startSpinner, stopSpinnerActive, success } from '../shared/ui.ts';
+import { dim, error, header, info, startSpinner, success } from '../shared/ui.ts';
 import * as wechat from './api/wechat.ts';
 import {
   configProblems,
@@ -38,14 +38,14 @@ import { buildIssues, type Issue } from './wechat-issues.ts';
  *   4. 打印一张**排期表**,你按它在后台设定时发表
  *
  * 用法:
- *   node src/publish/wechat.ts --list            # 期次清单 + 长度/标题/摘要预检(不联网)
- *   node src/publish/wechat.ts --build           # 生成预览页与 HTML 片段(不联网)
- *   node src/publish/wechat.ts --plan            # 排期表(不联网)
- *   node src/publish/wechat.ts --ip              # 查本机公网出口 IP(配白名单用)
- *   node src/publish/wechat.ts --check           # 对账草稿箱(只读,需要密钥)
- *   node src/publish/wechat.ts --drafts          # 建草稿:建完第 1 期会停下让你看排版
- *   node src/publish/wechat.ts --drafts --yes    # 不再停顿,一次建完
- *   node src/publish/wechat.ts --drafts --only 08 --force
+ *   node src/publish/publish.ts wechat --list            # 期次清单 + 长度/标题/摘要预检(不联网)
+ *   node src/publish/publish.ts wechat --build           # 生成预览页与 HTML 片段(不联网)
+ *   node src/publish/publish.ts wechat --plan            # 排期表(不联网)
+ *   node src/publish/publish.ts wechat --ip              # 查本机公网出口 IP(配白名单用)
+ *   node src/publish/publish.ts wechat --check           # 对账草稿箱(只读,需要密钥)
+ *   node src/publish/publish.ts wechat --drafts          # 建草稿:建完第 1 期会停下让你看排版
+ *   node src/publish/publish.ts wechat --drafts --yes    # 不再停顿,一次建完
+ *   node src/publish/publish.ts wechat --drafts --only 08 --force
  *
  * 退出码:0 完成、1 出错、2 在确认点暂停(状态已落盘,可续跑)、130 中断。
  */
@@ -190,7 +190,13 @@ async function loadIssues(opts: CliOptions): Promise<Loaded | { error: string }>
     return { error: (err as Error).message };
   }
 
-  const loaded = loadArticles(cfg.sourceDir, cfg.filePrefix, cfg.fromNumber, cfg.titleSource ?? 'h1');
+  const loaded = loadArticles(
+    cfg.sourceDir,
+    cfg.filePrefix,
+    cfg.fromNumber,
+    cfg.titleSource ?? 'h1',
+    cfg.titlePrefix ?? '',
+  );
   if ('error' in loaded) return { error: loaded.error };
 
   const built = buildIssues(loaded.articles, {
@@ -666,7 +672,7 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
 
 async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
   const hooks = buildHooks(opts);
-  const { cfg, issues, options, state, stateFile } = ready;
+  const { cfgName, cfg, issues, options, state, stateFile } = ready;
 
   const selected = selectIssues(issues, opts);
   if ('error' in selected) {
@@ -693,7 +699,7 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
 
   let created = 0;
   let skipped = 0;
-  let stale = 0;
+  let updated = 0;
 
   for (const issue of targets) {
     const st = ensureArticle(state, issue.id, issue.contentHash);
@@ -711,9 +717,43 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
       skipped++;
       continue;
     }
+    // 内容(正文或摘要)改过了 —— **就地更新**,不删重建。
+    // 删+建会换掉 media_id,期间那一期在草稿箱里是不存在的,中途失败就真丢了;
+    // 而「改了摘要」是最常发生的一类改动(改配置里的 digests 就会触发),不该走那条重路。
     if (st.status === 'drafted' && st.draftId && st.contentHash !== issue.contentHash && !opts.force) {
-      stale++;
-      dim(`  ! 第 ${issue.order} 期正文改过了,草稿是旧的(${st.draftId})—— 加 --force 会删掉它重建`);
+      const sp = startSpinner(`更新第 ${issue.order} 期草稿(${issue.title})`);
+      const upd = await wechat.updateDraft(
+        st.draftId,
+        {
+          title: issue.title,
+          content: issue.content,
+          digest: issue.digest || undefined,
+          author: cfg.author || undefined,
+          thumbMediaId: thumbMediaId || undefined,
+          contentSourceUrl: cfg.contentSourceUrl || undefined,
+        },
+        options,
+        hooks,
+      );
+      if (!upd.ok) {
+        sp.stopError('更新草稿失败');
+        error(upd.errMsg);
+        error(wechat.errorHint(upd.kind, upd.errMsg));
+        info('');
+        info(`  草稿 ${st.draftId} 仍是旧内容,没有丢。重跑可继续;`);
+        info('  若这个接口在个人号上不可用,加 --force 会删掉它整篇重建。');
+        return 1;
+      }
+      st.contentHash = issue.contentHash;
+      st.title = issue.title;
+      st.updatedAt = new Date().toISOString();
+      if (!saveStateOrReport(stateFile, state)) {
+        sp.stopError('状态写入失败');
+        return 1;
+      }
+      sp.stopSuccess(`第 ${issue.order} 期已更新 media_id=${st.draftId}`);
+      updated++;
+      if (opts.delayMs ?? cfg.delayMs) await delay(opts.delayMs ?? cfg.delayMs);
       continue;
     }
     if (st.draftId && opts.force) {
@@ -773,7 +813,7 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
       info(`  2. 顺手看一眼封面裁切(封面已自动上传,各期共用这一张)`);
       info(`  3. 都满意后重跑(会复用已建的草稿,继续建剩下的 ${targets.length - 1} 期):`);
       info('');
-      info(`     node src/publish/wechat.ts --drafts --yes`);
+      info(`     node src/publish/publish.ts wechat --drafts --yes`);
       info('');
       info(`  要改内容的话:改完 Markdown 重跑带 --force,会删掉旧草稿重建。`);
       return 2;
@@ -783,21 +823,21 @@ async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
   }
 
   header('完成');
-  info(`  本次新建 ${created} 期 · 跳过 ${skipped} 期${stale > 0 ? ` · 内容过期 ${stale} 期(需 --force)` : ''}`);
+  info(`  本次新建 ${created} 期 · 就地更新 ${updated} 期 · 跳过 ${skipped} 期`);
   const total = Object.values(state.articles).filter((s) => s.status === 'drafted' || s.status === 'published').length;
   info(`  累计已建/已发 ${total} 期`);
   info('');
-  info(`  下一步: node src/publish/wechat.ts --plan   # 按排期表在后台设定时发表`);
+  info(`  下一步: node src/publish/publish.ts wechat ${cfgName} --plan   # 按排期表在后台设定时发表`);
   return 0;
 }
 
 // ============ main ============
 
-async function main(): Promise<number> {
-  const parsed = parseArgs(process.argv.slice(2));
+export async function run(argv: string[]): Promise<number> {
+  const parsed = parseArgs(argv);
   if ('error' in parsed) {
     error(parsed.error);
-    error('用法: node src/publish/wechat.ts [配置名] [--list|--build|--plan|--check|--drafts|--ip]');
+    error('用法: node src/publish/publish.ts wechat [配置名] [--list|--build|--plan|--check|--drafts|--ip]');
     return 1;
   }
   const opts = parsed;
@@ -846,18 +886,4 @@ async function main(): Promise<number> {
   }
 }
 
-process.on('SIGINT', () => {
-  stopSpinnerActive();
-  console.log(pc.red('✖ 已中断'));
-  // 不在信号处理器里写状态文件(写盘竞态);靠「每建一期即落盘」保证可续跑
-  process.exit(130);
-});
-
-main()
-  .then((code) => {
-    process.exitCode = code;
-  })
-  .catch((err: unknown) => {
-    error(`未预期的错误: ${(err as Error).message}`);
-    process.exitCode = 1;
-  });
+// 入口在 src/publish/publish.ts —— 这里只导出 run(argv),不再自己执行。

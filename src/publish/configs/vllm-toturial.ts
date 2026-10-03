@@ -4,11 +4,11 @@ import type { PublishConfig } from '../publish-config.ts';
  * vLLM 教程(09~22 章)的掘金发布配置。
  *
  * 分类/标签 id 用下面的命令查真实值后填进来:
- *   node src/publish/juejin.ts --categories        # 查全部分类
- *   node src/publish/juejin.ts --tags vllm         # 按关键词查标签
+ *   node src/publish/publish.ts juejin --categories        # 查全部分类
+ *   node src/publish/publish.ts juejin --tags vllm         # 按关键词查标签
  *
  * 摘要必须 50~100 字、单行纯文本,目标区间 60~90。
- * 用 `node src/publish/juejin.ts --list` 可以一次看到全部 14 条的字数与校验结果。
+ * 用 `node src/publish/publish.ts juejin --list` 可以一次看到全部 14 条的字数与校验结果。
  */
 const config: PublishConfig = {
   sourceDir: 'vllm-toturial',
@@ -19,7 +19,7 @@ const config: PublishConfig = {
   // (源文件的 H1 是 `# 09 · 量化（Quantization）`,与此不同)
   titleSource: 'fileName',
 
-  // 以下 id 由 `node src/publish/juejin.ts --categories` / `--tags <词>` 实测得到(2026-09)
+  // 以下 id 由 `node src/publish/publish.ts juejin --categories` / `--tags <词>` 实测得到(2026-09)
   // 注意:分类「人工智能」与标签「人工智能」是两个不同的 id,别混用
   categoryId: '6809637773935378440', // 分类:人工智能
   // ⚠️ 最多 3 个(掘金服务端硬限制,err_no=4031),多给会直接建草稿失败

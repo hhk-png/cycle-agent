@@ -258,6 +258,7 @@ export function buildIssues(
       const part = i + 1;
       const parts = split.parts.length;
       const title = `${baseTitle}${partSuffix(part, parts)}`;
+      const digest = brief ? `${digestSuffix(part, parts)}${brief}` : '';
       if (title.length > TITLE_LIMIT) {
         warnings.push(`标题 ${title.length} 字,超过接口上限 ${TITLE_LIMIT}(会被拒或截断): ${title}`);
       } else if (title.length >= TITLE_LIMIT) {
@@ -276,7 +277,7 @@ export function buildIssues(
         part,
         parts,
         title,
-        digest: brief ? `${digestSuffix(part, parts)}${brief}` : '',
+        digest,
         content,
         markdown: md,
         // 哈希**渲染后的 HTML**而不是 markdown 源:`contentHash` 的用途是回答
@@ -284,7 +285,11 @@ export function buildIssues(
         // 也是产出的一部分 —— 只哈希 md 的话,改了样式常量、换了转义方式、
         // 修了渲染 bug,工具都会认为草稿仍然是最新的,于是**静默地不重建**。
         // (实测踩过:把 <input> 换成 ☐ 之后,27 期的哈希全都不变。)
-        contentHash: createHash('sha256').update(`${title}\n${content}`).digest('hex'),
+        //
+        // `digest` 也算进来:摘要和正文一样是草稿内容的一部分,只改配置里的
+        // digests 而不动正文时,哈希若不变,重跑 `--drafts` 会**静默跳过**,
+        // 改了的摘要永远推不上去。掘金那边同样的问题用 state 里的 `brief` 字段解决。
+        contentHash: createHash('sha256').update(`${title}\n${digest}\n${content}`).digest('hex'),
         limit,
         order: 0, // 下面统一编号
         warnings: own,

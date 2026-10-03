@@ -284,6 +284,24 @@ export interface DraftArticle {
 }
 
 /**
+ * 把一篇草稿组装成接口要的字段。
+ * 空字段一律不传:传 author:'' 之类的空串有可能被判成非法值。
+ */
+function buildDraftPayload(article: DraftArticle): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    title: article.title,
+    content: article.content,
+    need_open_comment: 0,
+    only_fans_can_comment: 0,
+  };
+  if (article.digest) payload.digest = article.digest;
+  if (article.author) payload.author = article.author;
+  if (article.thumbMediaId) payload.thumb_media_id = article.thumbMediaId;
+  if (article.contentSourceUrl) payload.content_source_url = article.contentSourceUrl;
+  return payload;
+}
+
+/**
  * 新增草稿。
  * ⚠️ 这是**建立侧**的接口:重试可能留下重复草稿(草稿不公开,`--check` 能对出来)。
  * 返回的 media_id 是草稿自己的 id —— 立刻落盘,再建下一篇。
@@ -296,17 +314,7 @@ export async function addDraft(
   const tokenRes = await getAccessToken(opts, hooks);
   if (!tokenRes.ok) return tokenRes;
 
-  // 空字段一律不传:传 author:'' 之类的空串有可能被判成非法值
-  const payload: Record<string, unknown> = {
-    title: article.title,
-    content: article.content,
-    need_open_comment: 0,
-    only_fans_can_comment: 0,
-  };
-  if (article.digest) payload.digest = article.digest;
-  if (article.author) payload.author = article.author;
-  if (article.thumbMediaId) payload.thumb_media_id = article.thumbMediaId;
-  if (article.contentSourceUrl) payload.content_source_url = article.contentSourceUrl;
+  const payload = buildDraftPayload(article);
 
   debug(hooks, `POST /cgi-bin/draft/add title="${article.title}" content=${article.content.length} 字符`);
   const res = await request<Envelope & { media_id?: string }>(
@@ -323,6 +331,46 @@ export async function addDraft(
   if (!res.ok) return res;
   if (!res.data.media_id) return { ok: false, errMsg: '新增草稿成功但没返回 media_id', kind: 'api', errCode: 0 };
   return { ok: true, data: res.data.media_id };
+}
+
+/**
+ * 就地更新已有草稿(摘要/正文改了之后用这条,而不是删了重建)。
+ *
+ * 与 `addDraft` 的两点差别,别写错:
+ *   · 路径是 `draft/update`,body 里多一个 `media_id`
+ *   · `articles` 是**对象**不是数组(新增时是数组),多一个 `index`
+ *
+ * 为什么优先用它而不是「删+建」:删+建会换掉 media_id,期间草稿箱里那一期是**不存在**的;
+ * 一旦中途失败就是真的丢了。而改摘要恰恰是最常发生的一种改动,不该走那条重路。
+ * 更新是幂等的(重发同样的内容不会变成两篇),所以可以放心重试。
+ *
+ * ⚠️ 它会整体替换这一期,`digest` 为空时不会传 —— 也就是说原有摘要可能被清掉。
+ * 我们的期次都有 digest,不受影响;真要让某期「没有摘要」时才需要留意这点。
+ */
+export async function updateDraft(
+  mediaId: string,
+  article: DraftArticle,
+  opts: WechatOptions,
+  hooks: WechatHooks = {},
+): Promise<WechatResult<true>> {
+  const tokenRes = await getAccessToken(opts, hooks);
+  if (!tokenRes.ok) return tokenRes;
+
+  const payload = buildDraftPayload(article);
+
+  debug(hooks, `POST /cgi-bin/draft/update media_id=${mediaId} content=${article.content.length} 字符`);
+  const res = await request<Envelope>(
+    `${BASE}/cgi-bin/draft/update?access_token=${tokenRes.data}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ media_id: mediaId, index: 0, articles: payload }),
+    },
+    opts,
+    2,
+    hooks,
+  );
+  return res.ok ? { ok: true, data: true } : res;
 }
 
 /**

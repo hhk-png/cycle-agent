@@ -146,7 +146,7 @@ async function main(): Promise<number> {
   const res = await listDrafts({ cookie, timeoutMs: VERIFY_TIMEOUT_MS });
   if (res.ok) {
     success(`Cookie 有效 —— 掘金认得这个登录态(当前草稿箱 ${(res.data ?? []).length} 篇)`);
-    info('接下来: node src/publish/juejin.ts --list   然后   node src/publish/juejin.ts');
+    info('接下来: node src/publish/publish.ts juejin --list   然后   node src/publish/publish.ts juejin');
     return 0;
   }
   if (res.authExpired) {
@@ -157,7 +157,7 @@ async function main(): Promise<number> {
   }
   // 非登录问题(网络、接口变动…)不该拦着用户,文件已经写好了
   info(`文件已保存,但连通性没验证成:${res.errMsg}`);
-  dim('  这不一定是 Cookie 的问题,直接跑 node src/publish/juejin.ts --list 看看即可。');
+  dim('  这不一定是 Cookie 的问题,直接跑 node src/publish/publish.ts juejin --list 看看即可。');
   return 0;
 }
 
