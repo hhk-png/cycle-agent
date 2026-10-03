@@ -190,12 +190,11 @@ export function isTransient(res: JuejinResult<unknown>): boolean {
 }
 
 /**
- * Business error looks like an expired session. The API words these in Chinese; those branches are
- * \u-escaped purely to keep this source file ASCII (they match "login", "not logged in",
- * "invalid", "expired" in the API's own wording). Do not drop them.
+ * Business error looks like an expired session. The Chinese alternatives match the API's own
+ * wording ("login", "not logged in", "invalid", "expired") — they are data, not prose. Do not drop them.
  */
 function looksLikeAuthError(errMsg: string): boolean {
-  return /\u767b\u5f55|\u672a\u767b\u5f55|login|token|\u5931\u6548|\u8fc7\u671f/i.test(errMsg);
+  return /登录|未登录|login|token|失效|过期/i.test(errMsg);
 }
 
 /** Single request; never throws */
@@ -227,8 +226,8 @@ async function juejinOnce<T>(
     }
     // When rate-limited or logged out, Juejin returns an HTML page instead of JSON
     if (!(res.headers.get('content-type') ?? '').includes('json')) {
-      // Chinese branch = the API's word for "login", \u-escaped to keep this file ASCII
-      const authExpired = /\u767b\u5f55|login/i.test(text);
+      // The Chinese alternative is the API's own word for "login"
+      const authExpired = /登录|login/i.test(text);
       return fail<T>(-3, 'body', authExpired ? 'Cookie has expired (the API returned a login page)' : 'The API did not return JSON', {
         httpStatus,
         raw: text.slice(0, 500),

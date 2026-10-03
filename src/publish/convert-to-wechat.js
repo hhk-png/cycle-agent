@@ -9,8 +9,8 @@ const path = require("path");
 // ── Config ──────────────────────────────────────────────
 const INPUT_DIR = __dirname;
 const OUTPUT_DIR = path.join(__dirname, "wechat-formatted");
-// Chinese "article summary" filename filter (escaped to keep this file ASCII)
-const EXCLUDE_PATTERN = "\u6587\u7ae0\u6458\u8981";
+// Filename filter: skips the Chinese "article summary" helper file
+const EXCLUDE_PATTERN = "文章摘要";
 
 // ── WeChat-compatible CSS styles ──────────────────────────
 const WECHAT_CSS = {
