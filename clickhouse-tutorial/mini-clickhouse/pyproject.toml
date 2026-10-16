@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-clickhouse"
+version = "0.1.0"
+description = "A readable, runnable, engineered re-implementation of the ClickHouse columnar OLAP architecture"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+minich = "minich.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+cache_dir = ".pytest_cache"
+filterwarnings = ["ignore::DeprecationWarning"]
+# 注意:这里**不设** `timeout`。那个选项来自 `pytest-timeout` 插件,
+# 而我们的依赖里没有它 —— 写了只会得到一条 "Unknown config option" 警告。
+# 测试的超时由 CI 或调用方自己控制。
+
+[tool.setuptools]
+packages = [
+    "minich",
+    "minich.aggregates",
+    "minich.columns",
+    "minich.execution",
+    "minich.formats",
+    "minich.functions",
+    "minich.sql",
+    "minich.storages",
+    "minich.storages.merge_tree",
+    "minich.system",
+    "minich.types",
+    "minich.util",
+]
