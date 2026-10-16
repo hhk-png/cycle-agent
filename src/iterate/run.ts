@@ -1,12 +1,11 @@
 import pc from 'picocolors';
 import path from 'node:path';
-import { killActiveClaude, runClaude } from './claude.ts';
+import { runClaude } from './claude.ts';
 import {
   isTTY,
   startSpinner,
   startStreamClock,
   stopSpinnerActive,
-  stopStreamClockActive,
   header,
   roundHeader,
   success,
@@ -23,19 +22,8 @@ import {
   type TutorialConfig,
 } from './config.ts';
 
-/** Flags run.ts itself understands; any other argument that is not a flag is the config name */
 const RUN_FLAGS = ['--list', '--stream', '--no-stream'];
 
-/**
- * Fields come only from config files under src/iterate/configs/, one file per tutorial; copy a config
- * to start a new tutorial.
- *
- * Usage:
- *   node src/iterate/run.ts                            # sole config, or select interactively if several
- *   node src/iterate/run.ts <config name>              # run src/iterate/configs/<config name>.ts
- *   node src/iterate/run.ts <config name> --no-stream  # print each round's output only when it ends
- *   node src/iterate/run.ts --list                     # list all configs
- */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
 
@@ -80,8 +68,6 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  // The config carries this tutorial's default; the command line overrides it. --stream exists only
-  // so the default can be stated explicitly.
   const streamFlag = args.includes('--no-stream') ? false : args.includes('--stream') ? true : undefined;
   const stream = streamFlag ?? config.stream ?? true;
 
@@ -98,6 +84,15 @@ async function main(): Promise<number> {
   dim(`  Rounds: round ${startAt}..${maxIterations}`);
   dim(`  Stream: ${stream ? 'on · output as it is generated' : 'off · output when each round ends'}`);
   console.log('');
+
+  let killHintShown = false;
+  const killHintLine = (pid: number): string => {
+    const stopCmd =
+      process.platform === 'win32'
+        ? `taskkill /PID ${pid} /T /F   (Git Bash: taskkill //PID ${pid} //T //F)`
+        : `kill ${pid}`;
+    return pc.dim(`  If Ctrl+C does not stop it: ${stopCmd}`);
+  };
 
   for (let i = startAt; i <= maxIterations; i++) {
     roundHeader(i, maxIterations);
@@ -117,9 +112,6 @@ async function main(): Promise<number> {
     const sp = interactive ? startSpinner(`Round ${i} · Claude generating`) : null;
     if (!interactive) dim(`▶ Round ${i} · Claude invoking …`);
 
-    // Once claude starts outputting, stop the spinner and stream instead — but keep a time reference
-    // via streamClock, which tops up an "elapsed Xs" line between body chunks.
-    // ⚠️ Chunks must go through clock.write(); it guarantees erase → write → top-up order.
     const clock = startStreamClock(`Round ${i}`);
     let streaming = false;
     const streamStart = (): void => {
@@ -142,10 +134,18 @@ async function main(): Promise<number> {
           streamStart();
           clock.write(chunk, 'stderr');
         },
+        onSpawn: (pid) => {
+          if (killHintShown) return;
+          killHintShown = true;
+          stopSpinnerActive();
+          streaming = true;
+          clock.write(`${killHintLine(pid)}\n`);
+        },
       },
       { stream },
     );
-    clock.stop(); // Erase progress before the completion line overwrites it
+    clock.stop();
+
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
 
     if (res.exitCode === 0) {
@@ -174,14 +174,6 @@ async function main(): Promise<number> {
 function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
-
-process.on('SIGINT', () => {
-  stopSpinnerActive();
-  stopStreamClockActive();
-  killActiveClaude();
-  console.log(pc.red('✖ Interrupted'));
-  process.exit(130);
-});
 
 main().then((code) => {
   process.exitCode = code;

@@ -9,7 +9,7 @@ const config: TutorialConfig = {
   claudeFlags: [
     '-p',
     '--effort',
-    'high',
+    'medium',
     '--dangerously-skip-permissions',
     '--verbose',
   ],
@@ -24,14 +24,14 @@ const config: TutorialConfig = {
 少一些markdown引用，尽量都在正文中表述。
 可以使用表格，但是尽量不使用表格描述内容，使用文字。
 直接输出最终内容，并将内容保存到 {targetDir} 目录下。
-只能操作和访问 {targetDir} 目录下的文件，不能操作其他目录下的文件。`,
+只能操作和访问 {targetDir} 目录，不能操作其他目录下的文件。`,
   refinePrompt: `用户初始描述：{description}
 请读取 {targetDir} 目录下的文件章节内容，在此基础上结合用户的输入进一步细化和完善，输出更详细的版本。可以适当的删减、增加和修改章节和章节的内容，使教程更完美，章节所覆盖的内容更完善，保证教程的可读性和连续性。
 少一些markdown引用，尽量都在正文中表述。
 可以使用表格，但是尽量不使用表格描述内容，使用文字。
 直接输出最终内容，并将内容保存到 {targetDir}目录下。
 每次先检查章节，看有没有可以增加和删除、修改的章节，如果有，可以对章节进行操作。
-只能操作和访问 {targetDir} 目录下的文件，不能操作其他目录下的文件。`,
+只能操作和访问 {targetDir} 目录，不能操作其他目录下的文件。`,
 };
 
 export default config;

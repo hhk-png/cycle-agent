@@ -14,12 +14,15 @@ let active: ReturnType<typeof spinner> | null = null;
 export function startSpinner(label: string): SpinnerHandle {
   const start = performance.now();
 
+  clearTimer();
+  active?.stop();
+
   active = spinner();
   active.start(label);
   timer = setInterval(() => {
     const secs = Math.floor((performance.now() - start) / 1000);
     active?.message(`${label} · ${secs}s`);
-  }, 100);
+  }, 100).unref();
 
   return {
     stopSuccess(msg: string) {
@@ -65,12 +68,6 @@ export interface StreamClock {
 /** The live clock (SIGINT must erase the half line it drew) */
 let activeClock: StreamClock | null = null;
 
-/** Stop the stream clock on SIGINT */
-export function stopStreamClockActive(): void {
-  activeClock?.stop();
-  activeClock = null;
-}
-
 /**
  * The "elapsed Xs" clock shown while streaming.
  *
@@ -84,10 +81,13 @@ export function startStreamClock(label: string): StreamClock {
   const start = performance.now();
   const tty = Boolean(process.stdout.isTTY);
 
+  activeClock?.stop();
+  activeClock = null;
+
   if (!tty) {
     const timer = setInterval(() => {
       console.log(`${label} · elapsed ${Math.floor((performance.now() - start) / 1000)}s`);
-    }, 30_000);
+    }, 30_000).unref();
     const plain: StreamClock = {
       write(chunk: string, to: 'stdout' | 'stderr' = 'stdout'): void {
         (to === 'stderr' ? process.stderr : process.stdout).write(chunk);
@@ -131,7 +131,7 @@ export function startStreamClock(label: string): StreamClock {
   };
 
   // Fallback: also repaint while the stream stalls (waiting on the model)
-  const timer = setInterval(paint, 1000);
+  const timer = setInterval(paint, 1000).unref();
 
   const clock: StreamClock = {
     write(chunk: string, to: 'stdout' | 'stderr' = 'stdout'): void {
