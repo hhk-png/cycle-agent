@@ -73,24 +73,162 @@ export function killActiveClaude(): void {
   }
 }
 
-/** Feed the prompt to `claude -p` via stdin; resolve with exit code and buffered output */
+/**
+ * Pin the flags that are coupled to how runClaude reads stdout.
+ *
+ * `--output-format` is not a per-tutorial choice: the stream parser only understands stream-json, and
+ * the passthrough only makes sense on text. So it is owned here rather than by a config — any value
+ * a config still carries is dropped, which keeps a copied config from silently breaking the parser.
+ * The rest of the flags (--effort, permissions) are passed through untouched.
+ */
+function normalizeFlags(flags: string[], stream: boolean): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < flags.length; i++) {
+    if (flags[i] === '--output-format') {
+      i += 1; // drop the value too
+      continue;
+    }
+    if (flags[i].startsWith('--output-format=')) continue;
+    out.push(flags[i]);
+  }
+  if (stream) {
+    if (!out.includes('--verbose')) out.push('--verbose'); // required by --print with stream-json
+    out.push('--output-format', 'stream-json', '--include-partial-messages');
+  } else {
+    out.push('--output-format', 'text');
+  }
+  return out;
+}
+
+/** Tool input keys worth showing as a one-line hint, most specific first */
+const TOOL_HINT_KEYS = ['file_path', 'path', 'command', 'pattern', 'url', 'prompt'];
+
+function toolHint(json: string): string {
+  try {
+    const input = JSON.parse(json) as Record<string, unknown>;
+    for (const key of TOOL_HINT_KEYS) {
+      const value = input[key];
+      if (typeof value === 'string' && value) return ` ${value.replace(/\s+/g, ' ').slice(0, 70)}`;
+    }
+  } catch {
+    // Input never completed, or was not JSON — fall back to the bare tool name
+  }
+  return '';
+}
+
+/**
+ * Turn claude's stream-json output into something worth watching.
+ *
+ * `--output-format text` emits nothing until the whole round finishes, which makes a long round
+ * indistinguishable from a hung one. stream-json emits one JSON object per line while the model
+ * generates, so text deltas can go straight to the caller's stream hook and tool calls can be
+ * annotated with what they touch — this is the only progress signal the program has.
+ */
+function createStreamParser(onText: (text: string) => void) {
+  let buffer = '';
+  let text = '';
+  /** Input JSON of the tool call currently streaming, so its target can be reported */
+  let pending: { index: number; name: string; json: string } | null = null;
+
+  const emit = (chunk: string): void => {
+    text += chunk;
+    onText(chunk);
+  };
+
+  const handle = (raw: string): void => {
+    const line = raw.trim();
+    if (!line) return;
+
+    let msg: Record<string, any>;
+    try {
+      msg = JSON.parse(line) as Record<string, any>;
+    } catch {
+      emit(`${raw}\n`); // Not JSON — pass it through rather than swallow the output
+      return;
+    }
+
+    if (msg.type === 'result') {
+      // The text already streamed; this only covers a stream that never produced deltas
+      if (!text && typeof msg.result === 'string') text = msg.result;
+      return;
+    }
+    if (msg.type !== 'stream_event') return; // system/assistant events carry nothing incremental
+
+    const ev = msg.event ?? {};
+    if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+      pending = { index: ev.index, name: ev.content_block.name ?? 'tool', json: '' };
+    } else if (ev.type === 'content_block_delta') {
+      if (ev.delta?.type === 'text_delta') {
+        emit(ev.delta.text ?? '');
+      } else if (ev.delta?.type === 'input_json_delta' && pending && ev.index === pending.index) {
+        pending.json += ev.delta.partial_json ?? '';
+      }
+    } else if (ev.type === 'content_block_stop' && pending && ev.index === pending.index) {
+      // Report the call only once its input is complete, so the hint names the real target
+      emit(`\n→ ${pending.name}${toolHint(pending.json)}\n`);
+      pending = null;
+    }
+  };
+
+  return {
+    push(chunk: string): void {
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) handle(line);
+    },
+    /** Parse the trailing line that never received its newline */
+    flush(): void {
+      const rest = buffer;
+      buffer = '';
+      if (rest.trim()) handle(rest);
+    },
+    output(): string {
+      return text;
+    },
+  };
+}
+
+/** Streaming off: hand the raw output through untouched, same shape as the stream parser */
+function createPassthrough(onText: (text: string) => void) {
+  let text = '';
+  return {
+    push(chunk: string): void {
+      text += chunk;
+      onText(chunk);
+    },
+    flush(): void {
+      // Nothing is buffered between chunks
+    },
+    output(): string {
+      return text;
+    },
+  };
+}
+
+/**
+ * Feed the prompt to `claude -p` via stdin; resolve with exit code and the assistant text.
+ *
+ * `stream` defaults to true; pass false to fall back to the config's own --output-format, where the
+ * whole round's output arrives at once when it ends.
+ */
 export function runClaude(
   args: string[],
   prompt: string,
   hooks: ClaudeHooks = {},
+  options: { stream?: boolean } = {},
 ): Promise<ClaudeResult> {
+  const stream = options.stream !== false;
+
   return new Promise((resolve) => {
-    const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn('claude', normalizeFlags(args, stream), { stdio: ['pipe', 'pipe', 'pipe'] });
     activeChild = child;
 
-    let stdout = '';
+    const onText = (text: string): void => hooks.onStdout?.(text);
+    const parser = stream ? createStreamParser(onText) : createPassthrough(onText);
     let stderr = '';
 
-    child.stdout?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      stdout += text;
-      hooks.onStdout?.(text);
-    });
+    child.stdout?.on('data', (chunk: Buffer) => parser.push(chunk.toString()));
 
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
@@ -111,7 +249,8 @@ export function runClaude(
 
     child.on('close', (code) => {
       activeChild = null;
-      resolve({ exitCode: code, stdout, stderr });
+      parser.flush();
+      resolve({ exitCode: code, stdout: parser.output(), stderr });
     });
 
     child.stdin?.end(prompt);

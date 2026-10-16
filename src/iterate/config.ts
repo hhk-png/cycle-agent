@@ -10,8 +10,16 @@ export interface TutorialConfig {
   title: string;
   /** Results are saved under ./<targetDir>/ */
   targetDir: string;
-  /** claude launch arguments */
+  /**
+   * claude launch arguments. Do not set --output-format here: the output format is tied to how the
+   * runner reads stdout and is pinned in claude.ts, so anything set here is discarded.
+   */
   claudeFlags: string[];
+  /**
+   * Stream the model's output while a round runs (default true). false restores the old behaviour of
+   * staying silent until the round ends. Overridden at runtime by --no-stream / --stream.
+   */
+  stream?: boolean;
   /** Start round; when >1 every round uses the refine template (resume on existing content) */
   startAt: number;
   /** When true, print each prompt without invoking claude (verification) */

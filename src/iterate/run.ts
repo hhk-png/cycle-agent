@@ -23,31 +23,42 @@ import {
   type TutorialConfig,
 } from './config.ts';
 
+/** Flags run.ts itself understands; any other argument that is not a flag is the config name */
+const RUN_FLAGS = ['--list', '--stream', '--no-stream'];
+
 /**
  * Fields come only from config files under src/iterate/configs/, one file per tutorial; copy a config
  * to start a new tutorial.
  *
  * Usage:
- *   node src/iterate/run.ts               # sole config, or select interactively if several
- *   node src/iterate/run.ts <config name> # run src/iterate/configs/<config name>.ts
- *   node src/iterate/run.ts --list        # list all configs
+ *   node src/iterate/run.ts                            # sole config, or select interactively if several
+ *   node src/iterate/run.ts <config name>              # run src/iterate/configs/<config name>.ts
+ *   node src/iterate/run.ts <config name> --no-stream  # print each round's output only when it ends
+ *   node src/iterate/run.ts --list                     # list all configs
  */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
 
-  if (args[0] === '--list') {
+  const unknown = args.filter((a) => a.startsWith('--') && !RUN_FLAGS.includes(a));
+  if (unknown.length > 0) {
+    error(`Unknown flag: ${unknown.join(', ')} (known: ${RUN_FLAGS.join(', ')})`);
+    return 1;
+  }
+
+  if (args.includes('--list')) {
     const names = listConfigNames();
     if (names.length === 0) info('There is no config file under src/iterate/configs/ yet; copy any file under src/iterate/configs/ and rename it to create one');
     else names.forEach((n) => info(`  ${n}`));
     return 0;
   }
 
-  if (args.length > 1) {
-    error('Usage: node src/iterate/run.ts [config name]');
+  const positional = args.filter((a) => !a.startsWith('--'));
+  if (positional.length > 1) {
+    error('Usage: node src/iterate/run.ts [config name] [--no-stream]');
     return 1;
   }
 
-  const configName = args[0];
+  const configName = positional[0];
   let config: TutorialConfig;
 
   if (configName) {
@@ -69,6 +80,11 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  // The config carries this tutorial's default; the command line overrides it. --stream exists only
+  // so the default can be stated explicitly.
+  const streamFlag = args.includes('--no-stream') ? false : args.includes('--stream') ? true : undefined;
+  const stream = streamFlag ?? config.stream ?? true;
+
   const interactive = isTTY();
   const { title, targetDir, claudeFlags, startAt, dryRun, firstRoundPrompt, refinePrompt } = config;
   const description = config.description;
@@ -80,6 +96,7 @@ async function main(): Promise<number> {
   header(title);
   dim(`  Description: ${truncate(description, 60)}`);
   dim(`  Rounds: round ${startAt}..${maxIterations}`);
+  dim(`  Stream: ${stream ? 'on · output as it is generated' : 'off · output when each round ends'}`);
   console.log('');
 
   for (let i = startAt; i <= maxIterations; i++) {
@@ -113,16 +130,21 @@ async function main(): Promise<number> {
     };
 
     const t0 = performance.now();
-    const res = await runClaude(claudeFlags, prompt, {
-      onStdout: (chunk) => {
-        streamStart();
-        clock.write(chunk);
+    const res = await runClaude(
+      claudeFlags,
+      prompt,
+      {
+        onStdout: (chunk) => {
+          streamStart();
+          clock.write(chunk);
+        },
+        onStderr: (chunk) => {
+          streamStart();
+          clock.write(chunk, 'stderr');
+        },
       },
-      onStderr: (chunk) => {
-        streamStart();
-        clock.write(chunk, 'stderr');
-      },
-    });
+      { stream },
+    );
     clock.stop(); // Erase progress before the completion line overwrites it
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
 
