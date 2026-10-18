@@ -1,0 +1,40 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-multihost
+  labels:
+    team: training
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+  workerGroupSpecs:
+    # One logical replica = two Pods (two hosts).  The autoscaler scales
+    # replicas, never individual hosts.  KubeRay creates the <cluster>-headless
+    # Service so hosts in a replica can discover each other.
+    - groupName: tpu-slice
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 4
+      numOfHosts: 2
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: 32Gi

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minikuberay"
+version = "1.7.1+mini.1"
+description = "A readable, runnable model of the KubeRay operator for learning and testing"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "MiniKubeRay authors" }]
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+minikuberay = "minikuberay.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["minikuberay*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

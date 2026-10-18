@@ -1,0 +1,63 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-sample
+  labels:
+    app.kubernetes.io/name: kuberay
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    serviceType: ClusterIP
+    template:
+      metadata:
+        labels:
+          app: ray-head
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            imagePullPolicy: IfNotPresent
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+              limits:
+                cpu: "2"
+                memory: 4Gi
+            ports:
+              - name: gcs-server
+                containerPort: 6379
+              - name: dashboard
+                containerPort: 8265
+              - name: client
+                containerPort: 10001
+              - name: metrics
+                containerPort: 8080
+              - name: serve
+                containerPort: 8000
+  workerGroupSpecs:
+    - groupName: small-group
+      replicas: 2
+      minReplicas: 0
+      maxReplicas: 4
+      rayStartParams: {}
+      template:
+        metadata:
+          labels:
+            app: ray-worker
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi
+                limits:
+                  cpu: "4"
+                  memory: 8Gi

@@ -1,0 +1,151 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: rayservices.ray.io
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: crd
+spec:
+  group: ray.io
+  names:
+    kind: RayService
+    listKind: RayServiceList
+    plural: rayservices
+    singular: rayservice
+    shortNames: [rs]
+    categories: [all]
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: service status
+          type: string
+          jsonPath: .status.serviceStatus
+        - name: serve endpoints
+          type: integer
+          jsonPath: .status.numServeEndpoints
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required: [rayClusterConfig]
+              properties:
+                serveConfigV2:
+                  type: string
+                  description: Ray Serve multi-application YAML.
+                rayClusterConfig:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                serveService:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                excludeHeadPodFromServeSvc:
+                  type: boolean
+                  default: false
+                suspend:
+                  type: boolean
+                  default: false
+                rayClusterDeletionDelaySeconds:
+                  type: integer
+                  minimum: 0
+                  default: 60
+                serviceUnhealthySecondThreshold:
+                  type: integer
+                  description: Deprecated; retained for API compatibility.
+                deploymentUnhealthySecondThreshold:
+                  type: integer
+                  description: Deprecated; retained for API compatibility.
+                managedBy:
+                  type: string
+                  enum: [ray.io/kuberay-operator, kueue.x-k8s.io/multikueue]
+                upgradeStrategy:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [NewCluster, NewClusterWithIncrementalUpgrade, None]
+                      default: NewCluster
+                    clusterUpgradeOptions:
+                      type: object
+                      properties:
+                        maxSurgePercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          default: 100
+                        stepSizePercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                        intervalSeconds:
+                          type: integer
+                          minimum: 1
+                        gatewayClassName:
+                          type: string
+                        gatewayName:
+                          type: string
+                        httpRouteName:
+                          type: string
+                          description: Adopt an existing HTTPRoute and only patch its weighted backendRefs.
+                        httpRouteInProgressLabels:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: Labels stamped on an adopted HTTPRoute while traffic is migrating (for GitOps ignore rules).
+            status:
+              type: object
+              properties:
+                serviceStatus:
+                  type: string
+                  enum: [Running, ""]
+                numServeEndpoints:
+                  type: integer
+                observedGeneration:
+                  type: integer
+                lastUpdateTime:
+                  type: string
+                  format: date-time
+                activeServiceStatus:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                pendingServiceStatus:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                conditions:
+                  type: array
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [type]
+                  items:
+                    type: object
+                    required: [type, status, reason, lastTransitionTime]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

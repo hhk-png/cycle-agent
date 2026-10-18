@@ -1,0 +1,44 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-rocksdb
+spec:
+  rayVersion: "2.59.0"
+  gcsFaultToleranceOptions:
+    backend: rocksdb
+    storage:
+      size: 20Gi
+      storageClassName: fast-ssd
+      accessModes:
+        - ReadWriteOnce
+      # Retain keeps the PVC after the RayCluster is deleted so it can be
+      # attached to a replacement head during recovery.
+      deletionPolicy: Retain
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 2
+      minReplicas: 0
+      maxReplicas: 8
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 8Gi

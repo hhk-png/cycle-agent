@@ -1,0 +1,79 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raycronjobs.ray.io
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: crd
+spec:
+  group: ray.io
+  names:
+    kind: RayCronJob
+    listKind: RayCronJobList
+    plural: raycronjobs
+    singular: raycronjob
+    shortNames: [rcj]
+    categories: [all]
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: schedule
+          type: string
+          jsonPath: .spec.schedule
+        - name: timezone
+          type: string
+          jsonPath: .spec.timeZone
+        - name: last schedule
+          type: date
+          jsonPath: .status.lastScheduleTime
+        - name: suspend
+          type: boolean
+          jsonPath: .spec.suspend
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required: [schedule, jobTemplate]
+              properties:
+                schedule:
+                  type: string
+                  minLength: 1
+                  description: Five-field cron expression. TZ/CRON_TZ prefixes are rejected.
+                timeZone:
+                  type: string
+                  minLength: 1
+                  description: IANA time zone. Defaults to the operator's local time zone.
+                suspend:
+                  type: boolean
+                  default: false
+                  description: Suspend scheduling; existing child RayJobs are unaffected.
+                jobTemplate:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                  description: RayJobSpec template copied into each child RayJob.
+            status:
+              type: object
+              properties:
+                lastScheduleTime:
+                  type: string
+                  format: date-time
+                suspended:
+                  type: boolean
+                  description: MiniKubeRay extension used for a visible suspend state.

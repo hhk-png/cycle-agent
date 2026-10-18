@@ -1,0 +1,48 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: rayjob-data
+  labels:
+    workload: ray-data
+spec:
+  # Placeholder entrypoint that is runnable with the stock image.  Bake
+  # etl.py into the image (or use runtime_env.working_dir) in production.
+  entrypoint: python -c "import ray; ray.init(); print('replace with Ray Data ETL')"
+  submissionMode: K8sJobMode
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 300
+  activeDeadlineSeconds: 7200
+  runtimeEnvYAML: |
+    env_vars:
+      INPUT_PATH: s3://example-bucket/raw
+      OUTPUT_PATH: s3://example-bucket/curated
+  rayClusterSpec:
+    rayVersion: "2.59.0"
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+    workerGroupSpecs:
+      - groupName: etl
+        replicas: 4
+        minReplicas: 0
+        maxReplicas: 32
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: ray
+                image: rayproject/ray:2.59.0
+                resources:
+                  requests:
+                    cpu: "4"
+                    memory: 16Gi

@@ -1,0 +1,10 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: rayjob-shared
+spec:
+  entrypoint: python -c "import ray; print('shared cluster')"
+  submissionMode: HTTPMode
+  shutdownAfterJobFinishes: false
+  clusterSelector:
+    ray.io/cluster: raycluster-sample

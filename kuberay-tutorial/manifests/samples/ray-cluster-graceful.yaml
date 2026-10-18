@@ -1,0 +1,73 @@
+# Graceful-shutdown RayCluster: the grace budget covers preStop, SIGTERM and
+# Ray's drain.  Use this as the baseline for scale-down and Spot workloads.
+#
+# Budget arithmetic (all seconds):
+#   terminationGracePeriodSeconds
+#     >= preStop duration + RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S + buffer
+#
+# KubeRay v1.7.1 does not inject a preStop hook into head or worker Pods.
+# This sample targets Ray 2.59+, where `ray start --block` handles SIGTERM and
+# drains up to RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S.  No preStop is used:
+# a `ray stop` hook would terminate the process before that drain can finish.
+#
+# Older Ray versions (or if you need an explicit stop hook) should instead use
+#   preStop: ["/bin/sh", "-c", "ray stop --grace-period 45"]
+# and budget preStop's own timeout in terminationGracePeriodSeconds.  Note that
+# `ray stop` defaults to a 16s grace period split across three process groups
+# (~5.3s each), so the default cannot honor a 30s drain timeout.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-cluster-graceful
+spec:
+  rayVersion: "2.59.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    version: v2
+    upscalingMode: Conservative
+    idleTimeoutSeconds: 60
+  headGroupSpec:
+    serviceType: ClusterIP
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        restartPolicy: Never
+        terminationGracePeriodSeconds: 60
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            env:
+              - name: RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S
+                value: "30"
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+              limits:
+                cpu: "2"
+                memory: 8Gi
+  workerGroupSpecs:
+    - groupName: cpu-workers
+      replicas: 0
+      minReplicas: 0
+      maxReplicas: 8
+      idleTimeoutSeconds: 60
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 60
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              env:
+                - name: RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S
+                  value: "30"
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi
+                limits:
+                  cpu: "4"
+                  memory: 16Gi

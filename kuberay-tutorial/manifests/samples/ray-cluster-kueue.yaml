@@ -1,0 +1,41 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-kueue
+  labels:
+    # Kueue's LocalQueue selected by the Workload.
+    kueue.x-k8s.io/queue-name: team-a-queue
+spec:
+  # Plain Kueue admission: the KubeRay operator still reconciles this object;
+  # Kueue decides when it may start based on ClusterQueue quota.
+  # For MultiKueue, set managedBy: kueue.x-k8s.io/multikueue and do NOT rely
+  # on the queue-name label for local admission.
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 2
+      minReplicas: 0
+      maxReplicas: 8
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 8Gi

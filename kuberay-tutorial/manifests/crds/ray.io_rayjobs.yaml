@@ -1,0 +1,199 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: rayjobs.ray.io
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: crd
+spec:
+  group: ray.io
+  names:
+    kind: RayJob
+    listKind: RayJobList
+    plural: rayjobs
+    singular: rayjob
+    shortNames: [rj]
+    categories: [all]
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: job status
+          type: string
+          jsonPath: .status.jobStatus
+        - name: deployment status
+          type: string
+          jsonPath: .status.jobDeploymentStatus
+        - name: ray cluster
+          type: string
+          jsonPath: .status.rayClusterName
+        - name: start time
+          type: string
+          jsonPath: .status.startTime
+        - name: end time
+          type: string
+          jsonPath: .status.endTime
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                entrypoint:
+                  type: string
+                  description: Command executed by the Ray driver.
+                runtimeEnvYAML:
+                  type: string
+                jobId:
+                  type: string
+                submissionMode:
+                  type: string
+                  enum: [K8sJobMode, HTTPMode, InteractiveMode, SidecarMode]
+                  default: K8sJobMode
+                submitterPodTemplate:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                submitterConfig:
+                  type: object
+                  properties:
+                    backoffLimit:
+                      type: integer
+                      minimum: 0
+                clusterSelector:
+                  type: object
+                  additionalProperties:
+                    type: string
+                metadata:
+                  type: object
+                  additionalProperties:
+                    type: string
+                entrypointResources:
+                  type: string
+                entrypointNumCpus:
+                  type: number
+                entrypointNumGpus:
+                  type: number
+                rayClusterSpec:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                shutdownAfterJobFinishes:
+                  type: boolean
+                  default: false
+                ttlSecondsAfterFinished:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                activeDeadlineSeconds:
+                  type: integer
+                  minimum: 1
+                preRunningDeadlineSeconds:
+                  type: integer
+                  minimum: 1
+                backoffLimit:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                suspend:
+                  type: boolean
+                  default: false
+                managedBy:
+                  type: string
+                  enum: [ray.io/kuberay-operator, kueue.x-k8s.io/multikueue]
+                deletionStrategy:
+                  type: object
+                  properties:
+                    onSuccess:
+                      type: object
+                      properties:
+                        policy:
+                          type: string
+                          enum: [DeleteCluster, DeleteWorkers, DeleteSelf, DeleteNone]
+                    onFailure:
+                      type: object
+                      properties:
+                        policy:
+                          type: string
+                          enum: [DeleteCluster, DeleteWorkers, DeleteSelf, DeleteNone]
+                    deletionRules:
+                      type: array
+                      items:
+                        type: object
+                        required: [policy, condition]
+                        properties:
+                          policy:
+                            type: string
+                            enum: [DeleteCluster, DeleteWorkers, DeleteSelf, DeleteNone]
+                          condition:
+                            type: object
+                            properties:
+                              jobStatus:
+                                type: string
+                                enum: [SUCCEEDED, FAILED]
+                              jobDeploymentStatus:
+                                type: string
+                                enum: [Failed]
+                              ttlSeconds:
+                                type: integer
+                                minimum: 0
+                                default: 0
+            status:
+              type: object
+              properties:
+                jobId:
+                  type: string
+                rayClusterName:
+                  type: string
+                dashboardURL:
+                  type: string
+                jobStatus:
+                  type: string
+                  enum: ["", PENDING, RUNNING, STOPPED, SUCCEEDED, FAILED]
+                jobDeploymentStatus:
+                  type: string
+                  enum: ["", Initializing, Running, Complete, Failed, ValidationFailed, Suspending, Suspended, Retrying, Waiting]
+                reason:
+                  type: string
+                message:
+                  type: string
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+                succeeded:
+                  type: integer
+                failed:
+                  type: integer
+                observedGeneration:
+                  type: integer
+                rayClusterStatus:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                rayJobInfo:
+                  type: object
+                  properties:
+                    startTime:
+                      type: string
+                      format: date-time
+                    endTime:
+                      type: string
+                      format: date-time
+                jobStatusCheckFailureStartTime:
+                  type: string
+                  format: date-time

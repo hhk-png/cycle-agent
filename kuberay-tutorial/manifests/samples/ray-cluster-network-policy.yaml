@@ -1,0 +1,54 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-netpol
+spec:
+  rayVersion: "2.59.0"
+  networkPolicy:
+    mode: DenyAll
+    head:
+      ingressRules:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: monitoring
+          ports:
+            - port: 8080
+              protocol: TCP
+    worker:
+      egressRules:
+        - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: kube-system
+          ports:
+            - port: 53
+              protocol: UDP
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 5
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi

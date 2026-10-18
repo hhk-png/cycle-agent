@@ -1,0 +1,94 @@
+# Cost-aware RayCluster: head on a small on-demand pool, workers on Spot.
+#
+# Prerequisites:
+#   * a node pool labelled karpenter.sh/capacity-type=spot (or your cloud's
+#     equivalent label) whose nodes carry the taint spot=true:NoSchedule
+#   * a small on-demand pool for the head
+#   * the Ray autoscaler v2 sidecar (enableInTreeAutoscaling)
+#   * a node autoscaler with enough capacity: Cluster Autoscaler node-group
+#     maxSize (node count) or Karpenter NodePool spec.limits (resource total)
+#     must cover maxReplicas x the worker request
+#
+# The PDB protects voluntary evictions during consolidation/drain.  It does
+# not protect against the Spot two-minute notice; that requires the worker
+# termination settings in ray-cluster-graceful.yaml.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-cluster-spot
+spec:
+  rayVersion: "2.59.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    version: v2
+    upscalingMode: Default
+    idleTimeoutSeconds: 60
+  headGroupSpec:
+    serviceType: ClusterIP
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        restartPolicy: Never
+        nodeSelector:
+          karpenter.sh/capacity-type: on-demand
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+              limits:
+                cpu: "2"
+                memory: 8Gi
+  workerGroupSpecs:
+    - groupName: spot-workers
+      replicas: 0
+      minReplicas: 0
+      maxReplicas: 12
+      idleTimeoutSeconds: 60
+      priority: 10
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            karpenter.sh/capacity-type: spot
+          tolerations:
+            - key: spot
+              operator: Equal
+              value: "true"
+              effect: NoSchedule
+          # Spread across zones so one Spot pool outage does not take every
+          # worker.  DoNotSchedule is intentionally not used: with a small
+          # cluster it would leave Pods Pending instead of scheduling them.
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  ray.io/cluster: ray-cluster-spot
+                  ray.io/group: spot-workers
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi
+                limits:
+                  cpu: "4"
+                  memory: 16Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ray-cluster-spot-workers
+spec:
+  maxUnavailable: 25%
+  selector:
+    matchLabels:
+      ray.io/cluster: ray-cluster-spot
+      ray.io/node-type: worker

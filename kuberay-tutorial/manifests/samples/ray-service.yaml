@@ -1,0 +1,49 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayservice-sample
+spec:
+  serveConfigV2: |
+    applications:
+      - name: text
+        import_path: text_app:deployment
+        route_prefix: /text
+        runtime_env:
+          working_dir: https://github.com/ray-project/serve_config_example/archive/refs/heads/master.zip
+        deployments:
+          - name: TextModel
+            num_replicas: 2
+            ray_actor_options:
+              num_cpus: 0.5
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+    workerGroupSpecs:
+      - groupName: serve-workers
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 10
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: ray
+                image: rayproject/ray:2.59.0
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: 4Gi
+  excludeHeadPodFromServeSvc: false
+  rayClusterDeletionDelaySeconds: 60

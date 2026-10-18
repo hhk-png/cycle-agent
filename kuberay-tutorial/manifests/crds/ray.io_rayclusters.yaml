@@ -1,0 +1,357 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: rayclusters.ray.io
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: crd
+spec:
+  group: ray.io
+  names:
+    kind: RayCluster
+    listKind: RayClusterList
+    plural: rayclusters
+    singular: raycluster
+    shortNames: [rc]
+    categories: [all]
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: desired workers
+          type: integer
+          jsonPath: .status.desiredWorkerReplicas
+        - name: available workers
+          type: integer
+          jsonPath: .status.availableWorkerReplicas
+        - name: cpus
+          type: string
+          jsonPath: .status.desiredCPU
+        - name: memory
+          type: string
+          jsonPath: .status.desiredMemory
+        - name: gpus
+          type: string
+          jsonPath: .status.desiredGPU
+        - name: status
+          type: string
+          jsonPath: .status.state
+        - name: age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required: [headGroupSpec]
+              properties:
+                rayVersion:
+                  type: string
+                  description: Ray image/runtime version used to render commands and defaults.
+                suspend:
+                  type: boolean
+                  default: false
+                  description: Delete all head and worker Pods while retaining the CR.
+                managedBy:
+                  type: string
+                  enum: [ray.io/kuberay-operator, kueue.x-k8s.io/multikueue]
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: the managedBy field is immutable
+                enableInTreeAutoscaling:
+                  type: boolean
+                  default: false
+                autoscalerOptions:
+                  type: object
+                  properties:
+                    version:
+                      type: string
+                      enum: [v1, v2]
+                    upscalingMode:
+                      type: string
+                      enum: [Default, Aggressive, Conservative]
+                    idleTimeoutSeconds:
+                      type: integer
+                      minimum: 0
+                      default: 60
+                    image:
+                      type: string
+                    imagePullPolicy:
+                      type: string
+                    resources:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    env:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                    envFrom:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                    volumeMounts:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                    command:
+                      type: array
+                      items:
+                        type: string
+                    args:
+                      type: array
+                      items:
+                        type: string
+                headServiceAnnotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                headGroupSpec:
+                  type: object
+                  required: [template]
+                  properties:
+                    template:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                      description: PodTemplateSpec for the Ray head Pod. The first container must be named ray.
+                    headService:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    enableIngress:
+                      type: boolean
+                    ingressOptions:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    serviceType:
+                      type: string
+                      default: ClusterIP
+                    rayStartParams:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    resources:
+                      type: object
+                      additionalProperties:
+                        type: string
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
+                workerGroupSpecs:
+                  type: array
+                  items:
+                    type: object
+                    required: [groupName, template]
+                    properties:
+                      groupName:
+                        type: string
+                      replicas:
+                        type: integer
+                        minimum: 0
+                        default: 0
+                      minReplicas:
+                        type: integer
+                        minimum: 0
+                        default: 0
+                      maxReplicas:
+                        type: integer
+                        minimum: 0
+                        default: 2147483647
+                      idleTimeoutSeconds:
+                        type: integer
+                        minimum: 0
+                      priority:
+                        type: integer
+                        default: 0
+                      numOfHosts:
+                        type: integer
+                        minimum: 1
+                        default: 1
+                      suspend:
+                        type: boolean
+                      template:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      rayStartParams:
+                        type: object
+                        additionalProperties:
+                          type: string
+                      resources:
+                        type: object
+                        additionalProperties:
+                          type: string
+                      labels:
+                        type: object
+                        additionalProperties:
+                          type: string
+                      scaleStrategy:
+                        type: object
+                        properties:
+                          workersToDelete:
+                            type: array
+                            items:
+                              type: string
+                gcsFaultToleranceOptions:
+                  type: object
+                  properties:
+                    backend:
+                      type: string
+                      enum: [redis, rocksdb]
+                      default: redis
+                    redisAddress:
+                      type: string
+                    redisUsername:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    redisPassword:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    externalStorageNamespace:
+                      type: string
+                    storage:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                historyServerOptions:
+                  type: object
+                  properties:
+                    collectorOptions:
+                      type: object
+                      properties:
+                        image:
+                          type: string
+                        imagePullPolicy:
+                          type: string
+                        resources:
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                        env:
+                          type: array
+                          items:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                networkPolicy:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum: [DenyAll, DenyAllIngress, DenyAllEgress]
+                      default: DenyAll
+                    head:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    worker:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    workerGroups:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                tlsOptions:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                authOptions:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum: [disabled, token]
+                      default: token
+                    secretName:
+                      type: string
+                    enableK8sTokenAuth:
+                      type: boolean
+                upgradeStrategy:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [Recreate, None]
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+                  enum: [ready, failed, suspended, ""]
+                reason:
+                  type: string
+                message:
+                  type: string
+                observedGeneration:
+                  type: integer
+                desiredWorkerReplicas:
+                  type: integer
+                availableWorkerReplicas:
+                  type: integer
+                readyWorkerReplicas:
+                  type: integer
+                minWorkerReplicas:
+                  type: integer
+                maxWorkerReplicas:
+                  type: integer
+                desiredCPU:
+                  type: string
+                desiredMemory:
+                  type: string
+                desiredGPU:
+                  type: string
+                desiredTPU:
+                  type: string
+                lastUpdateTime:
+                  type: string
+                  format: date-time
+                endpoints:
+                  type: object
+                  additionalProperties:
+                    type: string
+                head:
+                  type: object
+                  properties:
+                    podIP:
+                      type: string
+                    serviceIP:
+                      type: string
+                    podName:
+                      type: string
+                    serviceName:
+                      type: string
+                conditions:
+                  type: array
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [type]
+                  items:
+                    type: object
+                    required: [type, status, reason, lastTransitionTime]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

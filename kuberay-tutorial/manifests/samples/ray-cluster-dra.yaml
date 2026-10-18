@@ -1,0 +1,45 @@
+# Teaching sample: DRA (Dynamic Resource Allocation) via the Pod template.
+#
+# KubeRay v1.7.1 has no dedicated DRA field, but the Pod template is passed
+# through, so a worker can reference a ResourceClaimTemplate.  The cluster must
+# have the DRA feature gate/API, a DRA-capable GPU driver, and a DeviceClass
+# named "nvidia-gpu".  Ray does not detect DRA devices automatically; the
+# explicit num-gpus below keeps Ray's resource view aligned with the claim.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-dra
+  namespace: default
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "2"
+                memory: 4Gi
+  workerGroupSpecs:
+    - groupName: gpu
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 4
+      rayStartParams:
+        num-gpus: "1"
+      template:
+        spec:
+          restartPolicy: Never
+          resourceClaims:
+            - name: gpu
+              resourceClaimTemplateName: ray-gpu
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0-gpu
+              resources:
+                claims:
+                  - name: gpu

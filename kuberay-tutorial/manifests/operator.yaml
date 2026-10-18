@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kuberay-operator
+  namespace: kuberay-system
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: kuberay-operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberay
+      app.kubernetes.io/component: kuberay-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kuberay
+        app.kubernetes.io/component: kuberay-operator
+    spec:
+      serviceAccountName: kuberay-operator
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kuberay-operator
+          image: quay.io/kuberay/operator:v1.7.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --enable-leader-election
+            # 默认不开启 alpha gate。一次只加一个，观察后再推进，例如：
+            # - --feature-gates=RayCronJob=true
+            # - --feature-gates=RayClusterNetworkPolicy=true
+            - --metrics-addr=:8080
+            - --health-probe-bind-address=:8082
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: probes
+              containerPort: 8082
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: probes
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: probes
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          env:
+            - name: ENABLE_INIT_CONTAINER_INJECTION
+              value: "true"
+            - name: ENABLE_PROBES_INJECTION
+              value: "true"
+            - name: RAYCLUSTER_DEFAULT_REQUEUE_SECONDS_ENV
+              value: "300"
+      terminationGracePeriodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kuberay-operator
+  namespace: kuberay-system
+  labels:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: kuberay-operator
+spec:
+  selector:
+    app.kubernetes.io/name: kuberay
+    app.kubernetes.io/component: kuberay-operator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

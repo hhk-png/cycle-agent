@@ -1,0 +1,63 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayservice-canary
+spec:
+  serveConfigV2: |
+    applications:
+      - name: api
+        import_path: app:deployment
+        route_prefix: /api
+        # Replace with your code image or an internal artifact URL.  The
+        # stock rayproject image does not contain app.py.
+        runtime_env:
+          working_dir: https://github.com/ray-project/serve_config_example/archive/refs/heads/master.zip
+        deployments:
+          - name: APIDeployment
+            num_replicas: 2
+            ray_actor_options:
+              num_cpus: 0.5
+  upgradeStrategy:
+    type: NewClusterWithIncrementalUpgrade
+    clusterUpgradeOptions:
+      maxSurgePercent: 50
+      stepSizePercent: 10
+      intervalSeconds: 30
+      # Adopt an existing HTTPRoute managed by the platform team.  KubeRay
+      # patches only spec.rules[0].backendRefs.
+      httpRouteName: platform-ray-route
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      version: v2
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+    workerGroupSpecs:
+      - groupName: serve
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 16
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: ray
+                image: rayproject/ray:2.59.0
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: 4Gi

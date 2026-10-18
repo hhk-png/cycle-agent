@@ -1,0 +1,70 @@
+# A small shared cluster for interactive development.
+#
+# Typical use:
+#   kubectl port-forward svc/ray-cluster-dev-head-svc 8265:8265
+#   # open http://127.0.0.1:8265, submit jobs through the Jobs API
+#
+# Do not expose the Ray Client port (10001) to untrusted networks.  Ray Client
+# is deprecated; the Jobs API on the dashboard port is the supported path.
+# The cluster scales to zero workers when idle, so notebooks that keep a
+# kernel alive must use a long enough idleTimeoutSeconds.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-cluster-dev
+  labels:
+    platform.example.com/tenant: alice
+spec:
+  rayVersion: "2.59.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    version: v2
+    upscalingMode: Default
+    idleTimeoutSeconds: 300
+  headGroupSpec:
+    serviceType: ClusterIP
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+      num-cpus: "2"
+    template:
+      spec:
+        restartPolicy: Never
+        # Ray 2.59 的 drain 默认 30s；grace 必须大于 drain + 传播 + buffer。
+        terminationGracePeriodSeconds: 60
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            env:
+              - name: RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S
+                value: "20"
+            resources:
+              requests:
+                cpu: "2"
+                memory: 4Gi
+              limits:
+                cpu: "2"
+                memory: 4Gi
+  workerGroupSpecs:
+    - groupName: dev-workers
+      replicas: 0
+      minReplicas: 0
+      maxReplicas: 4
+      idleTimeoutSeconds: 300
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 60
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              env:
+                - name: RAY_GRACEFUL_SHUTDOWN_DRAIN_TIMEOUT_S
+                  value: "20"
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                limits:
+                  cpu: "2"
+                  memory: 8Gi

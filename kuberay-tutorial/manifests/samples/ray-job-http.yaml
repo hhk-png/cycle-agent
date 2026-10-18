@@ -1,0 +1,24 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: rayjob-http
+spec:
+  entrypoint: python -c "import ray; print('http mode')"
+  submissionMode: HTTPMode
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 120
+  rayClusterSpec:
+    rayVersion: "2.59.0"
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+    workerGroupSpecs: []

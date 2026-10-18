@@ -1,0 +1,56 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayservice-incremental
+spec:
+  serveConfigV2: |
+    applications:
+      - name: api
+        import_path: api:app
+        route_prefix: /api
+        # The stock Ray image does not contain api.py; provide a code image or
+        # an artifact URL that every node can fetch.
+        runtime_env:
+          working_dir: https://github.com/ray-project/serve_config_example/archive/refs/heads/master.zip
+  upgradeStrategy:
+    type: NewClusterWithIncrementalUpgrade
+    clusterUpgradeOptions:
+      maxSurgePercent: 40
+      stepSizePercent: 5
+      intervalSeconds: 10
+      gatewayClassName: cluster-gateway
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      version: v2
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+    workerGroupSpecs:
+      - groupName: serve
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 20
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: ray
+                image: rayproject/ray:2.59.0
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: 4Gi

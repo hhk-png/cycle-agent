@@ -1,0 +1,70 @@
+# In-Place Pod Resizing (IPPR).
+#
+# Prerequisites:
+#   * Kubernetes 1.35+ (in-place Pod resize GA; cgroup v2, no swap)
+#   * KubeRay v1.5+ (the ray.io/ippr annotation is alpha in the v1.7 line)
+#   * Ray autoscaler v2 (the tutorial baseline is Ray 2.59)
+#
+# The worker group starts at 1 CPU / 1Gi and may grow to 4 CPU / 4Gi without
+# recreating the Pod.  Do NOT put num-cpus or memory in rayStartParams: the
+# autoscaler must derive the Raylet's logical resources from the Pod requests,
+# otherwise a resize would change the cgroup but not what Ray schedules on.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-ippr
+  annotations:
+    ray.io/ippr: '{"groups":{"small-group":{"max-cpu":"4","max-memory":"4Gi","resize-timeout":60}}}'
+spec:
+  rayVersion: "2.59.0"
+  enableInTreeAutoscaling: true
+  autoscalerOptions:
+    version: v2
+    upscalingMode: Default
+    env:
+      # A short interval makes the resize observable in a lab.  Production
+      # values are usually 5-10s; do not set this to 0.
+      - name: AUTOSCALER_UPDATE_INTERVAL_S
+        value: "1"
+  headGroupSpec:
+    rayStartParams:
+      num-cpus: "0"
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 4Gi
+              limits:
+                cpu: "1"
+                memory: 4Gi
+  workerGroupSpecs:
+    - groupName: small-group
+      replicas: 1
+      minReplicas: 1
+      maxReplicas: 10
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 1Gi
+                limits:
+                  cpu: "4"
+                  memory: 4Gi
+              # IPPR can only change CPU/memory in place.  RestartContainer
+              # would recreate the container and is rejected by KubeRay.
+              resizePolicy:
+                - resourceName: cpu
+                  restartPolicy: NotRequired
+                - resourceName: memory
+                  restartPolicy: NotRequired

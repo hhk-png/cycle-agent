@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuberay-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kuberay-operator
+  namespace: kuberay-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kuberay-operator
+rules:
+  - apiGroups: [ray.io]
+    resources:
+      - rayclusters
+      - rayclusters/status
+      - rayclusters/finalizers
+      - rayjobs
+      - rayjobs/status
+      - rayjobs/finalizers
+      - rayservices
+      - rayservices/status
+      - rayservices/finalizers
+      - raycronjobs
+      - raycronjobs/status
+      - raycronjobs/finalizers
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - events
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - persistentvolumeclaims
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies, ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [cert-manager.io]
+    resources: [certificates, issuers, clusterissuers]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kuberay-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kuberay-operator
+subjects:
+  - kind: ServiceAccount
+    name: kuberay-operator
+    namespace: kuberay-system

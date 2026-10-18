@@ -1,0 +1,89 @@
+# Native sidecar containers (Kubernetes 1.33+).
+#
+# A native sidecar is an init container with restartPolicy: Always.  It starts
+# before the Ray container, must pass its readinessProbe before Ray starts, and
+# is stopped after the Ray container exits (in reverse order).  This ordering is
+# what makes log/metrics collectors reliable around Ray's graceful shutdown.
+#
+# The sidecar's requests count toward the Pod's scheduling footprint.  Keep
+# them small: a 2-CPU Ray worker with a 1-CPU log shipper changes the node
+# shape and the Ray autoscaler's view of the Pod.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-native-sidecar
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        initContainers:
+          - name: log-shipper
+            image: fluent/fluent-bit:3.1
+            restartPolicy: Always
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            readinessProbe:
+              httpGet:
+                path: /api/v1/health
+                port: 2020
+              initialDelaySeconds: 1
+              periodSeconds: 2
+            volumeMounts:
+              - name: ray-logs
+                mountPath: /var/log/ray
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+            volumeMounts:
+              - name: ray-logs
+                mountPath: /var/log/ray
+        volumes:
+          - name: ray-logs
+            emptyDir: {}
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 4
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          initContainers:
+            - name: log-shipper
+              image: fluent/fluent-bit:3.1
+              restartPolicy: Always
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+              readinessProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "test -f /tmp/ready"]
+                initialDelaySeconds: 1
+                periodSeconds: 2
+              volumeMounts:
+                - name: ray-logs
+                  mountPath: /var/log/ray
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi
+              volumeMounts:
+                - name: ray-logs
+                  mountPath: /var/log/ray
+          volumes:
+            - name: ray-logs
+              emptyDir: {}

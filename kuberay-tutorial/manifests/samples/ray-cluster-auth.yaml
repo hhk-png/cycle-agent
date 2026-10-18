@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ray-cluster-token
+type: Opaque
+stringData:
+  auth_token: "replace-with-a-long-random-token"
+---
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-auth
+spec:
+  rayVersion: "2.59.0"
+  authOptions:
+    mode: token
+    secretName: ray-cluster-token
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 2
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi

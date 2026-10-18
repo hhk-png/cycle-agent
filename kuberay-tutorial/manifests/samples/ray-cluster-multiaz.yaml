@@ -1,0 +1,82 @@
+# Multi-AZ RayCluster: spread workers across zones, keep the head on a
+# stable node pool, and protect voluntary disruptions with a PDB.
+#
+# Prerequisites:
+#   * nodes labelled with topology.kubernetes.io/zone
+#   * a "normal" (non-spot) node pool labelled node.kubernetes.io/lifecycle=normal
+#   * at least 3 zones for the DoNotSchedule spread constraint
+#   * adjust the image tag and resource requests to your cluster
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-multiaz
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        restartPolicy: Never
+        nodeSelector:
+          node.kubernetes.io/lifecycle: normal
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+              limits:
+                cpu: "4"
+                memory: 16Gi
+  workerGroupSpecs:
+    - groupName: cpu-workers
+      replicas: 6
+      minReplicas: 3
+      maxReplicas: 12
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: DoNotSchedule
+              minDomains: 3
+              labelSelector:
+                matchLabels:
+                  ray.io/cluster: raycluster-multiaz
+                  ray.io/group: cpu-workers
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        ray.io/cluster: raycluster-multiaz
+                        ray.io/group: cpu-workers
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                limits:
+                  cpu: "4"
+                  memory: 16Gi
+---
+# PDB protects voluntary evictions (drain/upgrade), not zone failures.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: raycluster-multiaz-workers
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      ray.io/cluster: raycluster-multiaz
+      ray.io/node-type: worker

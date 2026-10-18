@@ -10,7 +10,6 @@
   "packageManager": "pnpm@11.8.0",
   "scripts": {
     "start": "node src/iterate/run.ts",
-    "dev": "node --watch src/iterate/run.ts",
     "configs": "node src/iterate/run.ts --list",
     "publish": "node src/publish/publish.ts",
     "publish:juejin": "node src/publish/publish.ts juejin",

@@ -1,0 +1,58 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: rayjob-train
+  labels:
+    workload: ray-train
+spec:
+  # Placeholder entrypoint that is runnable with the stock image.  In
+  # production, bake train.py into the image (or provide a working_dir) and
+  # replace this command.
+  entrypoint: python -c "import ray; ray.init(); print('replace with TorchTrainer entrypoint')"
+  submissionMode: K8sJobMode
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 86400
+  runtimeEnvYAML: |
+    env_vars:
+      DATA_PATH: s3://example-bucket/train
+      CHECKPOINT_PATH: s3://example-bucket/checkpoints
+  rayClusterSpec:
+    rayVersion: "2.59.0"
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0-gpu
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi
+    workerGroupSpecs:
+      - groupName: gpu-workers
+        replicas: 2
+        minReplicas: 0
+        maxReplicas: 8
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            nodeSelector:
+              nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            containers:
+              - name: ray
+                image: rayproject/ray:2.59.0-gpu
+                resources:
+                  requests:
+                    cpu: "8"
+                    memory: 64Gi
+                    nvidia.com/gpu: "1"
+                  limits:
+                    nvidia.com/gpu: "1"

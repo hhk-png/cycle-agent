@@ -1,0 +1,43 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-gpu
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams:
+      num-gpus: "0"
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0-gpu
+            resources:
+              requests:
+                cpu: "2"
+                memory: 8Gi
+              limits:
+                cpu: "4"
+                memory: 16Gi
+  workerGroupSpecs:
+    - groupName: a100
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 2
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0-gpu
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: 64Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"

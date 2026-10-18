@@ -1,0 +1,37 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: raycluster-volcano
+  labels:
+    # The operator reads this queue name when it creates the PodGroup.
+    ray.io/queue: team-a
+spec:
+  rayVersion: "2.59.0"
+  headGroupSpec:
+    rayStartParams: {}
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: ray
+            image: rayproject/ray:2.59.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+  workerGroupSpecs:
+    - groupName: workers
+      replicas: 4
+      minReplicas: 4
+      maxReplicas: 8
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray:2.59.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi

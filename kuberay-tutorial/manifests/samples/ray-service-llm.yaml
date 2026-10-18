@@ -1,0 +1,72 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayservice-llm
+spec:
+  # Ray Serve LLM builds an OpenAI-compatible app around vLLM.  Pin the model
+  # and engine versions; model weights are pulled from object storage or HF.
+  serveConfigV2: |
+    applications:
+      - name: llm
+        import_path: ray.serve.llm:build_openai_app
+        route_prefix: /
+        args:
+          llm_configs:
+            - model_loading_config:
+                model_id: meta-llama/Llama-3.1-8B-Instruct
+              deployment_config:
+                autoscaling_config:
+                  min_replicas: 1
+                  max_replicas: 4
+                  target_num_ongoing_requests_per_replica: 8
+                ray_actor_options:
+                  num_gpus: 1
+                  num_cpus: 2
+              engine_kwargs:
+                tensor_parallel_size: 1
+                max_model_len: 8192
+              accelerator_type: A100
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      version: v2
+      upscalingMode: Default
+      idleTimeoutSeconds: 120
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ray
+              image: rayproject/ray-llm:2.59.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi
+    workerGroupSpecs:
+      - groupName: gpu
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 4
+        rayStartParams: {}
+        template:
+          spec:
+            restartPolicy: Never
+            nodeSelector:
+              nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            containers:
+              - name: ray
+                image: rayproject/ray-llm:2.59.0
+                resources:
+                  requests:
+                    cpu: "8"
+                    memory: 64Gi
+                    nvidia.com/gpu: "1"
+                  limits:
+                    nvidia.com/gpu: "1"
