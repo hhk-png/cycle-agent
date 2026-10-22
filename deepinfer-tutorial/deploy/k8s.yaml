@@ -1,0 +1,205 @@
+# Minimal Kubernetes shape for an inference service.
+#
+# This manifest is deliberately runnable with a CPU image.  For a GPU/NPU
+# deployment, replace the resource block with the vendor device plugin
+# resources (nvidia.com/gpu or the Ascend equivalent), add node affinity and
+# topology constraints, and mount the model cache from a shared PVC.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mini-deepinfer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mini-deepinfer-config
+  namespace: mini-deepinfer
+data:
+  MINI_DEEPINFER_NUM_BLOCKS: "256"
+  MINI_DEEPINFER_MAX_NUM_SEQS: "16"
+  MINI_DEEPINFER_MAX_MODEL_LEN: "512"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mini-deepinfer
+  namespace: mini-deepinfer
+  labels:
+    app: mini-deepinfer
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: mini-deepinfer
+  template:
+    metadata:
+      labels:
+        app: mini-deepinfer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: engine
+          image: mini-deepinfer:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: mini-deepinfer-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          readinessProbe:
+            # /ready returns 503 while draining, so the Service removes the
+            # Pod before in-flight requests finish.  /health stays 200 for
+            # liveness and load-balancer status checks.
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                # Flip readiness first, then ask the server to drain.  The
+                # Python one-liner avoids depending on curl in the slim image.
+                command:
+                  - "sh"
+                  - "-c"
+                  - >-
+                    python -c "import urllib.request as u;
+                    u.urlopen(u.Request('http://127.0.0.1:8000/admin/drain',
+                    method='POST'), timeout=2)" || true;
+                    sleep 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: model-cache
+              mountPath: /models
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: mini-deepinfer-models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mini-deepinfer-models
+  namespace: mini-deepinfer
+spec:
+  accessModes: ["ReadOnlyMany"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mini-deepinfer
+  namespace: mini-deepinfer
+  labels:
+    app: mini-deepinfer
+spec:
+  selector:
+    app: mini-deepinfer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mini-deepinfer
+  namespace: mini-deepinfer
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mini-deepinfer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mini-deepinfer
+  namespace: mini-deepinfer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mini-deepinfer
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    # NOTE: the teaching server exposes request/token/latency gauges but not a
+    # queue-depth metric.  This entry shows the shape of a custom-metric HPA;
+    # install a metrics adapter (or replace the metric with one your stack
+    # provides) before applying it to a real cluster.
+    - type: Pods
+      pods:
+        metric:
+          name: mini_deepinfer_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "4"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mini-deepinfer-ingress
+  namespace: mini-deepinfer
+spec:
+  podSelector:
+    matchLabels:
+      app: mini-deepinfer
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000

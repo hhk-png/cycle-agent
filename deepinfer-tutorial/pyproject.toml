@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-deepinfer"
+version = "0.1.0"
+description = "A NumPy teaching implementation of DeepInfer's core inference mechanisms"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "mini-deepinfer contributors" }]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+mini-deepinfer = "mini_deepinfer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mini_deepinfer*"]
+
+[tool.setuptools.package-data]
+mini_deepinfer = ["assets/*.npz", "assets/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

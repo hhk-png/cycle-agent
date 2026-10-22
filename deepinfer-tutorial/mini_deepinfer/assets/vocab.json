@@ -1,0 +1,13 @@
+{
+  "type": "byte",
+  "special_tokens": {
+    "<|pad|>": 256,
+    "<|bos|>": 257,
+    "<|eos|>": 258,
+    "<|user|>": 259,
+    "<|assistant|>": 260,
+    "<|end|>": 261,
+    "<|image|>": 262,
+    "<|tool|>": 263
+  }
+}

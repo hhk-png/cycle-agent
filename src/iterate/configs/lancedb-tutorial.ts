@@ -16,7 +16,7 @@ const config: TutorialConfig = {
   startAt: 1, // start round; >1 resumes all rounds with the refine template
   dryRun: false, // true = print each round's prompt only (no claude)
   description:
-    '生成一个LanceDB的教程，以章节的形式呈现，使用markdown。并且在其中需要包括一个简版的LanceDB的实现，这个实现需要按照工程化的思路实现，要包含LanceDB的所有的内容，并且可以运行，这个需要写完之后验证。教程也要包括所有的内容，现在的实现以及未来的方向和实现等等。尽可能的包括全部的信息。要有技术深度，也要有技术广度。',
+    '生成一个LanceDB的教程，以章节的形式呈现，使用markdown。并且在其中需要包括一个简版的LanceDB的实现，这个实现需要按照工程化的思路实现，要包含LanceDB的所有的内容，并且可以运行，这个需要写完之后验证。教程也要包括所有的内容，现在的实现以及未来的方向和实现等等。尽可能的包括全部的信息。要有技术深度，也要有技术广度，也要稍微照顾一下初学者。最后可以加几节商业分析。',
   maxIterations: 5,
   firstRoundPrompt: `用户初始描述：{description}
 
