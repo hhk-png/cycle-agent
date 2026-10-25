@@ -13,6 +13,9 @@ const config: WechatConfig = {
   startDate: '2026-11-01',
   digests: {},
   renderMode: 'wechat',
+  // Appendix B renders to ~600k chars. Draft/add accepted it in one piece, so raise
+  // the guardrail above the default 500k instead of splitting it into two issues.
+  contentLimit: 1_000_000,
 
   delayMs: 3000,
   timeoutMs: 15000,
