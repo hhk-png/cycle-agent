@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Article } from './articles.ts';
-import { mdToWechatHtml, WECHAT_CONTENT_LIMIT } from './markdown.ts';
+import { mdToWechatHtml, WECHAT_CONTENT_LIMIT, type WechatRenderMode } from './markdown.ts';
 
 /**
  * Arranges tutorial chapters into WeChat issues. **Default: one chapter = one issue.**
@@ -88,8 +88,8 @@ interface Chunk {
 }
 
 /** Final conversion's measure: HTML source length (UTF-16 code units) */
-export function measure(markdown: string): number {
-  return mdToWechatHtml(markdown).length;
+export function measure(markdown: string, mode: WechatRenderMode = 'wechat'): number {
+  return mdToWechatHtml(markdown, mode).length;
 }
 
 const joinChunks = (chunks: Chunk[]): string => chunks.map((c) => c.md).join('\n\n');
@@ -142,11 +142,12 @@ function partitionMinimax(lens: number[], k: number): number[] | null {
 export function splitArticle(
   markdown: string,
   limit: number = WECHAT_CONTENT_LIMIT,
+  mode: WechatRenderMode = 'wechat',
 ): { parts: string[] } | { error: string } {
-  const whole = measure(markdown);
+  const whole = measure(markdown, mode);
   if (whole <= limit) return { parts: [markdown] };
 
-  const chunks: Chunk[] = splitAtH2(markdown).map((md) => ({ md, htmlLen: measure(md) }));
+  const chunks: Chunk[] = splitAtH2(markdown).map((md) => ({ md, htmlLen: measure(md, mode) }));
   if (chunks.length < 2) {
     return {
       error:
@@ -169,7 +170,7 @@ export function splitArticle(
 
     // Cut points use summed section lengths; verify by re-converting each part
     const tooBig = parts
-      .map((p, i) => ({ i, len: measure(p) }))
+      .map((p, i) => ({ i, len: measure(p, mode) }))
       .find((x) => x.len > limit);
     if (!tooBig) {
       if (parts.some((p) => !p.trim())) return { error: 'Splitting produced an empty body section; check the heading levels.' };
@@ -209,6 +210,8 @@ export interface IssueOptions {
   titleOverrides?: Record<string, string>;
   /** Effective split limit (default WECHAT_CONTENT_LIMIT; guardrail, not the API limit) */
   contentLimit?: number;
+  /** Output style: the tutorial's own typography or the account's native typography */
+  renderMode?: WechatRenderMode;
 }
 
 /** Arrange all issues; digests are keyed by two-digit number and shared across parts */
@@ -217,9 +220,10 @@ export function buildIssues(
   opts: IssueOptions,
 ): { issues: Issue[] } | { error: string } {
   const limit = opts.contentLimit ?? WECHAT_CONTENT_LIMIT;
+  const mode = opts.renderMode ?? 'wechat';
   const issues: Issue[] = [];
   for (const a of articles) {
-    const split = splitArticle(a.content, limit);
+    const split = splitArticle(a.content, limit, mode);
     if ('error' in split) return { error: `Article ${a.no}: ${split.error}` };
 
     const baseTitle = opts.titleOverrides?.[a.no] ?? a.title;
@@ -239,7 +243,7 @@ export function buildIssues(
         warnings.push(`Title is exactly ${title.length} chars, right at the limit; consider shortening it`);
       }
 
-      const content = mdToWechatHtml(md);
+      const content = mdToWechatHtml(md, mode);
       const own = [...warnings];
       // Report the title override once, on the first part
       if (part === 1 && opts.titleOverrides?.[a.no]) {

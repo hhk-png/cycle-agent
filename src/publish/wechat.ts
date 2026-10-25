@@ -40,6 +40,7 @@ import { buildIssues, type Issue } from './wechat-issues.ts';
  *   node src/publish/publish.ts wechat --plan            # schedule table(offline)
  *   node src/publish/publish.ts wechat --ip              # look up this machine's public egress IP(for whitelisting)
  *   node src/publish/publish.ts wechat --check           # reconcile the draft box(read-only, requires keys)
+ *   node src/publish/publish.ts wechat --tidy            # fallback: strip blank paragraphs around code blocks if the editor inserted any
  *   node src/publish/publish.ts wechat --drafts          # create drafts: after issue 1 it stops so you can check the layout
  *   node src/publish/publish.ts wechat --drafts --yes    # no more stops, create them all in one go
  *   node src/publish/publish.ts wechat --drafts --only 08 --force
@@ -57,6 +58,7 @@ interface CliOptions {
   build: boolean;
   plan: boolean;
   check: boolean;
+  tidy: boolean;
   drafts: boolean;
   ip: boolean;
   only: string | null;
@@ -73,6 +75,7 @@ function defaultOptions(): CliOptions {
     build: false,
     plan: false,
     check: false,
+    tidy: false,
     drafts: false,
     ip: false,
     only: null,
@@ -98,6 +101,7 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
       case '--build': o.build = true; break;
       case '--plan': o.plan = true; break;
       case '--check': o.check = true; break;
+      case '--tidy': o.tidy = true; break;
       case '--drafts': o.drafts = true; break;
       case '--ip': o.ip = true; break;
       case '--force': o.force = true; break;
@@ -200,6 +204,7 @@ async function loadIssues(opts: CliOptions): Promise<Loaded | { error: string }>
     digests: cfg.digests,
     titleOverrides: cfg.titleOverrides,
     contentLimit: cfg.contentLimit,
+    renderMode: cfg.renderMode,
   });
   if ('error' in built) return { error: built.error };
 
@@ -660,6 +665,116 @@ async function runCheck(ready: Ready, opts: CliOptions): Promise<number> {
   return 0;
 }
 
+// ============ --tidy ============
+
+/**
+ * Fallback cleanup for `<p><span leaf=""><br></span></p>` inserted before/after
+ * `section.code-snippet__fix`. The root cause turned out to be the outer wrapper
+ * `<div>` — the editor unwraps it and inserts those paragraphs while doing so. The
+ * `wechat` renderer no longer emits a wrapper (fonts live on each block), so current
+ * drafts stay clean after opening. This command remains for older drafts or if the
+ * editor changes behaviour.
+ */
+const EMPTY_P = String.raw`<p(?:\s[^>]*)?>\s*<span[^>]*>\s*<br\s*\/?>\s*<\/span>\s*<\/p>`;
+const CODE_SECTION_OPEN = String.raw`<section[^>]*class=["'][^"']*code-snippet__fix[^"']*["'][^>]*>`;
+
+function countEmptyParagraphs(s: string): number {
+  return (s.match(new RegExp(EMPTY_P, 'g')) ?? []).length;
+}
+
+export function tidyCodeBlockSpacing(html: string): { html: string; removed: number } {
+  let removed = 0;
+
+  // Before each code section
+  let out = html.replace(new RegExp(`(?:${EMPTY_P})+(?=${CODE_SECTION_OPEN})`, 'g'), (match) => {
+    removed += countEmptyParagraphs(match);
+    return '';
+  });
+
+  // After each code section
+  out = out.replace(
+    new RegExp(`(${CODE_SECTION_OPEN}[\\s\\S]*?<\\/section>)((?:${EMPTY_P})+)`, 'g'),
+    (_match, section: string, empties: string) => {
+      removed += countEmptyParagraphs(empties);
+      return section;
+    },
+  );
+
+  return { html: out, removed };
+}
+
+async function runTidy(ready: Ready, opts: CliOptions): Promise<number> {
+  const hooks = buildHooks(opts);
+  const { issues, options, state } = ready;
+
+  const selected = selectIssues(issues, opts);
+  if ('error' in selected) {
+    error(selected.error);
+    return 1;
+  }
+
+  header('Strip editor-inserted blank paragraphs');
+  info(`  ${selected.length} issues selected`);
+  info('');
+
+  let changed = 0;
+  let skipped = 0;
+  let removed = 0;
+
+  for (const issue of selected) {
+    const st = state.articles[issue.id];
+    if (!st?.draftId) {
+      skipped++;
+      continue;
+    }
+
+    const got = await wechat.getDraft(st.draftId, options, hooks);
+    if (!got.ok) {
+      error(`Issue ${issue.order}: failed to read draft ${st.draftId}: ${got.errMsg}`);
+      error(wechat.errorHint(got.kind, got.errMsg));
+      return 1;
+    }
+
+    const tidied = tidyCodeBlockSpacing(got.data.content);
+    if (tidied.removed === 0) {
+      skipped++;
+      continue;
+    }
+
+    const upd = await wechat.updateDraft(
+      st.draftId,
+      {
+        title: got.data.title,
+        content: tidied.html,
+        digest: got.data.digest || undefined,
+        author: got.data.author || undefined,
+        thumbMediaId: got.data.thumbMediaId || undefined,
+        contentSourceUrl: got.data.contentSourceUrl || undefined,
+      },
+      options,
+      hooks,
+    );
+    if (!upd.ok) {
+      error(`Issue ${issue.order}: failed to update draft ${st.draftId}: ${upd.errMsg}`);
+      error(wechat.errorHint(upd.kind, upd.errMsg));
+      return 1;
+    }
+
+    st.updatedAt = new Date().toISOString();
+    if (!saveStateOrReport(ready.stateFile, state)) return 1;
+
+    success(`  Issue ${issue.order}: removed ${tidied.removed} blank paragraph(s)`);
+    changed++;
+    removed += tidied.removed;
+    if (opts.delayMs ?? ready.cfg.delayMs) await delay(opts.delayMs ?? ready.cfg.delayMs);
+  }
+
+  header('Done');
+  info(`  Updated ${changed} draft(s), removed ${removed} blank paragraph(s); ${skipped} skipped`);
+  dim('  Fallback cleanup: current drafts should stay clean after opening; rerun only if blanks reappear.');
+  return 0;
+}
+
 // ============ --drafts ============
 
 async function runDrafts(ready: Ready, opts: CliOptions): Promise<number> {
@@ -826,7 +941,7 @@ export async function run(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if ('error' in parsed) {
     error(parsed.error);
-    error('Usage: node src/publish/publish.ts wechat [configName] [--list|--build|--plan|--check|--drafts|--ip]');
+    error('Usage: node src/publish/publish.ts wechat [configName] [--list|--build|--plan|--check|--tidy|--drafts|--ip]');
     return 1;
   }
   const opts = parsed;
@@ -869,6 +984,7 @@ export async function run(argv: string[]): Promise<number> {
   }
   try {
     if (opts.check) return await runCheck(ready, opts);
+    if (opts.tidy) return await runTidy(ready, opts);
     return await runDrafts(ready, opts);
   } finally {
     releaseLock(ready.stateFile);

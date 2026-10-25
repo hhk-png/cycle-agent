@@ -54,6 +54,12 @@ export interface WechatConfig {
 
   /** Effective split limit, default 500k — a guardrail, not the API limit (see src/publish/markdown.ts) */
   contentLimit?: number;
+  /**
+   * How the body is rendered. `wechat` (default) keeps the styled body typography but
+   * uses WeChat's native code module and a light formula box. `styled` is the old dark
+   * highlighted code block. `native` emits plain semantic tags (browser defaults).
+   */
+  renderMode?: 'styled' | 'native' | 'wechat';
   /** "Read original" link; unverified subscription accounts don't support external links, so empty by default */
   contentSourceUrl?: string;
 

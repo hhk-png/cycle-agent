@@ -26,9 +26,10 @@ interface ConvertedStyles {
 }
 
 interface Converter {
-  parseMarkdown(md: string): string;
+  parseMarkdown(md: string, mode?: 'styled' | 'native' | 'wechat'): string;
   buildPage(title: string, bodyHtml: string): string;
   WECHAT_CSS: ConvertedStyles;
+  WECHAT_LIKE_CSS: ConvertedStyles;
 }
 
 let cached: Converter | null = null;
@@ -45,7 +46,7 @@ function loadConverter(): Converter {
   const file = fileURLToPath(new URL('./convert-to-wechat.js', import.meta.url));
   const source = readFileSync(file, 'utf8')
     .replace(/\nmain\(\);\s*$/, '\n')
-    .concat('\nvar __WECHAT_CSS = WECHAT_CSS;\n');
+    .concat('\nvar __WECHAT_CSS = WECHAT_CSS;\nvar __WECHAT_LIKE_CSS = WECHAT_LIKE_CSS;\n');
 
   // This module is ESM (no `require`); the script is CommonJS. createRequire gives it one so its
   // internal `require("fs")`/`require("path")` resolve.
@@ -68,13 +69,17 @@ function loadConverter(): Converter {
   const parseMarkdown = sandbox.parseMarkdown;
   const buildPage = sandbox.buildPage;
   const styles = sandbox.__WECHAT_CSS;
-  if (typeof parseMarkdown !== 'function' || typeof buildPage !== 'function' || !styles) {
-    throw new Error(`Unexpected load result from ${file}: parseMarkdown/buildPage/WECHAT_CSS is missing`);
+  const wechatStyles = sandbox.__WECHAT_LIKE_CSS;
+  if (typeof parseMarkdown !== 'function' || typeof buildPage !== 'function' || !styles || !wechatStyles) {
+    throw new Error(
+      `Unexpected load result from ${file}: parseMarkdown/buildPage/WECHAT_CSS/WECHAT_LIKE_CSS is missing`,
+    );
   }
   cached = {
     parseMarkdown: parseMarkdown as Converter['parseMarkdown'],
     buildPage: buildPage as Converter['buildPage'],
     WECHAT_CSS: styles as ConvertedStyles,
+    WECHAT_LIKE_CSS: wechatStyles as ConvertedStyles,
   };
   return cached;
 }
@@ -101,14 +106,24 @@ function assertNoStrippedTags(html: string): string {
   return html;
 }
 
+/** `styled`: the script's own typography (colored headings, dark code blocks).
+ *  `native`: plain semantic tags only — truly unstyled, which renders as browser
+ *  defaults because WeChat does not apply its editor theme to API-created drafts.
+ *  `wechat`: WeChat-like body typography (17px/#333/1.75, quiet headings, light code box). */
+export type WechatRenderMode = 'styled' | 'native' | 'wechat';
+
 /**
  * Converts Markdown into official-account body HTML. Lossless; length validation is the caller's job.
  */
-export function mdToWechatHtml(markdown: string): string {
+export function mdToWechatHtml(markdown: string, mode: WechatRenderMode = 'wechat'): string {
   const conv = loadConverter();
-  const body = fixCodeBlockWrapping(conv.parseMarkdown(markdown));
-  // Outer container carries the script's document typography, matching its buildPage preview.
-  const html = `<div style="${conv.WECHAT_CSS.wrapper}">${body}</div>`;
+  const body = fixCodeBlockWrapping(conv.parseMarkdown(markdown, mode));
+  // `wechat` deliberately has no outer container: the editor unwraps a wrapper <div>
+  // when it rewrites a draft, and that unwrap is what inserts blank paragraphs around
+  // the code sections. Fonts/margins already sit on each block, so the wrapper is
+  // redundant. `native` is plain tags; only `styled` keeps its typographic wrapper.
+  const html =
+    mode === 'styled' ? `<div style="${conv.WECHAT_CSS.wrapper}">${body}</div>` : body;
   return assertNoStrippedTags(html);
 }
 

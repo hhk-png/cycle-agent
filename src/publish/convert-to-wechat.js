@@ -45,6 +45,77 @@ const WECHAT_CSS = {
   del: "text-decoration: line-through; color: #999;",
 };
 
+// Native mode: emit plain semantic tags and let the Official Account editor apply its
+// own typography. The only declaration kept is the code-block wrap rule — without it,
+// long lines are truncated in the WeChat body (see markdown.ts's fixCodeBlockWrapping).
+const NATIVE_CSS = {
+  wrapper: "",
+  h1: "", h2: "", h3: "", h4: "",
+  p: "", strong: "", em: "", inlineCode: "",
+  pre: "white-space: pre-wrap; word-break: break-all;",
+  preCode: "",
+  blockquote: "",
+  table: "", th: "", td: "", trEven: "", trOdd: "",
+  ul: "", ol: "", li: "", hr: "", a: "", del: "",
+};
+
+// "wechat" mode: the Official Account does not apply its editor theme to drafts created
+// through the API, so truly unstyled HTML renders as browser defaults. This is the
+// closest practical approximation — WeChat's usual 17px/#333/1.75 body text, quiet
+// headings, and a light code box instead of the styled mode's dark highlighted one.
+// Formulas in ```text fences keep their spacing via pre-wrap but are not typeset:
+// WeChat has no math renderer, and the source itself is plain text.
+// The Official Account editor strips the outer wrapper <div> when it rewrites a draft,
+// so the font has to sit on every text-bearing block as well, not only on the wrapper.
+// Non-code/formula elements keep the original styled look: blue left-border headings,
+// justified body, blue table header, blue links. The outer wrapper is gone (it is what
+// made the editor insert blank paragraphs around code sections), so the wrapper's base
+// typography is repeated on each block that carries text.
+const ORIGINAL_FONT =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Helvetica,Arial,sans-serif";
+const BODY_BASE = `font-family:${ORIGINAL_FONT};font-size:16px;color:#3f3f3f;line-height:1.8;letter-spacing:0.5px;`;
+
+const WECHAT_LIKE_CSS = {
+  wrapper: `${BODY_BASE}word-break:break-word;`,
+
+  h1: `font-family:${ORIGINAL_FONT};font-size:22px;font-weight:bold;color:#2c3e50;text-align:center;margin:20px 0 16px 0;padding-bottom:12px;border-bottom:2px solid #3498db;line-height:1.4;`,
+  h2: `font-family:${ORIGINAL_FONT};font-size:20px;font-weight:bold;color:#2c3e50;margin:28px 0 14px 0;padding-left:12px;border-left:4px solid #3498db;line-height:1.4;`,
+  h3: `font-family:${ORIGINAL_FONT};font-size:18px;font-weight:bold;color:#34495e;margin:22px 0 10px 0;line-height:1.4;`,
+  h4: `font-family:${ORIGINAL_FONT};font-size:16px;font-weight:bold;color:#555;margin:16px 0 8px 0;line-height:1.4;`,
+
+  p: `${BODY_BASE}margin:0 0 12px 0;text-align:left;`,
+  strong: "font-weight:bold;color:#2c3e50;",
+  em: "font-style:italic;color:#555;",
+  inlineCode: "background-color:#f6f6f6;color:#d14;padding:2px 6px;border-radius:3px;font-family:Consolas,Menlo,Monaco,Courier New,monospace;font-size:14px;letter-spacing:0;",
+
+  // Formula blocks only (```text): light box. Code fences use WeChat's code module.
+  pre: "background:#f6f8fa;border-radius:6px;padding:14px 16px;margin:16px 0;font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;overflow-x:auto;text-align:left;",
+  preCode: "font-family:Consolas,Menlo,Monaco,Courier New,monospace;font-size:14px;background:transparent;color:#24292e;padding:0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;",
+
+  blockquote: `${BODY_BASE}border-left:4px solid #3498db;background-color:#f0f7fb;padding:12px 16px;margin:14px 0;color:#555;border-radius:0 4px 4px 0;`,
+
+  table: `${BODY_BASE}border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;table-layout:auto;`,
+  th: "background-color:#3498db;color:white;padding:10px 12px;border:1px solid #2980b9;font-weight:bold;text-align:left;",
+  td: "padding:8px 12px;border:1px solid #ddd;",
+  trEven: "background-color:#f9f9f9;",
+  trOdd: "background-color:#fff;",
+
+  ul: "margin:10px 0;padding-left:24px;",
+  ol: "margin:10px 0;padding-left:24px;",
+  li: `${BODY_BASE}margin:4px 0;`,
+  hr: "border:0;border-top:1px solid #e0e0e0;margin:24px 0;",
+  a: "color:#3498db;text-decoration:none;word-break:break-all;",
+  del: "text-decoration:line-through;color:#999;",
+};
+
+// Languages that are really prose/diagrams, not code: keep the light formula box.
+const NON_CODE_LANGS = new Set(["", "text", "plaintext", "plain", "txt"]);
+
+/** Emit a style attribute only when there is something to emit */
+function styleAttr(css) {
+  return css ? ` style="${css}"` : "";
+}
+
 // ══════════════════════════════════════════════════════════
 //  Syntax highlighting system (WeChat-compatible — uses font tags instead of span+style)
 // ══════════════════════════════════════════════════════════
@@ -75,8 +146,31 @@ const HL_TAG = {
   comment: "i",
 };
 
-// Wrap with a font tag (WeChat-compatible, avoids style="..." being taken apart)
-function wrapHL(text, colorKey) {
+// Class names used by WeChat's own code block (highlight.js-style, prefixed).
+const HL_CLASS = {
+  keyword: "code-snippet__keyword",
+  string: "code-snippet__string",
+  comment: "code-snippet__comment",
+  number: "code-snippet__number",
+  literal: "code-snippet__literal",
+  func: "code-snippet__function",
+  type: "code-snippet__type",
+  operator: "code-snippet__operator",
+  builtin: "code-snippet__built_in",
+  var: "code-snippet__variable",
+  decorator: "code-snippet__meta",
+  regex: "code-snippet__regexp",
+  constant: "code-snippet__literal",
+  meta: "code-snippet__meta",
+};
+
+// Wrap with a font tag (WeChat-compatible, avoids style="..." being taken apart).
+// `useClass` emits WeChat code-module classes instead, for the native code block.
+function wrapHL(text, colorKey, useClass) {
+  if (useClass) {
+    const cls = HL_CLASS[colorKey];
+    return cls ? `<span class="${cls}">${text}</span>` : text;
+  }
   const color = HL[colorKey] || "white";
   const tag = HL_TAG[colorKey];
   let html = `<font color="${color}">${text}</font>`;
@@ -89,7 +183,7 @@ function wrapHL(text, colorKey) {
 // and priority, so each character is colored at most once (no double-wrap/overlap).
 // Regions (strings/comments) rank before tokens, masking keywords inside them; no
 // placeholder characters to be swallowed by later regexes.
-function highlightCode(rawCode, lang) {
+function highlightCode(rawCode, lang, useClass) {
   if (!rawCode || rawCode.trim() === "") return "";
 
   const def = getLangDef(lang);
@@ -131,7 +225,7 @@ function highlightCode(rawCode, lang) {
   for (const sp of spans) {
     if (sp.start > pos) out.push(escapeHtml(rawCode.slice(pos, sp.start)));
     const t = escapeHtml(rawCode.slice(sp.start, sp.end));
-    out.push(sp.rule.colorKey ? wrapHL(t, sp.rule.colorKey) : t); // colorKey===null → mask as plain text
+    out.push(sp.rule.colorKey ? wrapHL(t, sp.rule.colorKey, useClass) : t); // colorKey===null → mask as plain text
     pos = sp.end;
   }
   if (pos < rawCode.length) out.push(escapeHtml(rawCode.slice(pos)));
@@ -422,24 +516,38 @@ function preserveWhitespace(html) {
 }
 
 // ── Inline rendering ──────────────────────────────────────────
-const inlineRules = [
-  { re: /!\[([^\]]*)\]\(([^)\s]+(?:\s+"[^"]*")?)\)/g, fn: (_, alt, src) => `<img src="${src}" alt="${alt}" style="max-width:100%;display:block;margin:12px auto;border-radius:4px;">` },
-  { re: /\[([^\]]+)\]\(([^)\s]+)\)/g, fn: (_, text, href) => `<a href="${href}" style="${WECHAT_CSS.a}" target="_blank">${text}</a>` },
-  { re: /\*\*\*(.+?)\*\*\*/g, fn: (_, text) => `<strong style="${WECHAT_CSS.strong}"><em>${text}</em></strong>` },
-  { re: /\*\*(.+?)\*\*/g, fn: (_, text) => `<strong style="${WECHAT_CSS.strong}">${text}</strong>` },
-  { re: /(?<!\*)\*([^*\n]+?)\*(?!\*)/g, fn: (_, text) => `<em style="${WECHAT_CSS.em}">${text}</em>` },
-  { re: /~~(.+?)~~/g, fn: (_, text) => `<del style="${WECHAT_CSS.del}">${text}</del>` },
-  { re: /`([^`\n]+?)`/g, fn: (_, text) => `<code style='${WECHAT_CSS.inlineCode}'>${escapeHtml(text)}</code>` },
-];
+function inlineRules(css, native) {
+  const imgStyle = native ? "max-width:100%;" : "max-width:100%;display:block;margin:12px auto;border-radius:4px;";
+  return [
+    { re: /!\[([^\]]*)\]\(([^)\s]+(?:\s+"[^"]*")?)\)/g, fn: (_, alt, src) => `<img src="${src}" alt="${alt}" style="${imgStyle}">` },
+    { re: /\[([^\]]+)\]\(([^)\s]+)\)/g, fn: (_, text, href) => `<a href="${href}"${styleAttr(css.a)} target="_blank">${text}</a>` },
+    { re: /\*\*\*(.+?)\*\*\*/g, fn: (_, text) => `<strong${styleAttr(css.strong)}><em>${text}</em></strong>` },
+    { re: /\*\*(.+?)\*\*/g, fn: (_, text) => `<strong${styleAttr(css.strong)}>${text}</strong>` },
+    { re: /(?<!\*)\*([^*\n]+?)\*(?!\*)/g, fn: (_, text) => `<em${styleAttr(css.em)}>${text}</em>` },
+    { re: /~~(.+?)~~/g, fn: (_, text) => `<del${styleAttr(css.del)}>${text}</del>` },
+    { re: /`([^`\n]+?)`/g, fn: (_, text) => `<code${styleAttr(css.inlineCode)}>${escapeHtml(text)}</code>` },
+  ];
+}
 
-function renderInline(text) {
-  for (const rule of inlineRules) {
+function renderInline(text, css, native) {
+  for (const rule of inlineRules(css, native)) {
     text = text.replace(rule.re, rule.fn);
   }
   return text;
 }
 
-function parseMarkdown(md) {
+/**
+ * @param {string} md
+ * @param {"styled"|"native"|"wechat"} [mode]
+ *   styled (default) → the tutorial's own colored/dark look;
+ *   native → plain semantic tags, no styles at all;
+ *   wechat → WeChat-like body typography with a light code box.
+ */
+function parseMarkdown(md, mode) {
+  const native = mode === "native";
+  const wechat = mode === "wechat";
+  const css = wechat ? WECHAT_LIKE_CSS : native ? NATIVE_CSS : WECHAT_CSS;
+  const inline = (text) => renderInline(text, css, native);
   const lines = md.split("\n");
   const htmlLines = [];
   let i = 0;
@@ -457,10 +565,40 @@ function parseMarkdown(md) {
         i++;
       }
       const rawCode = codeLines.join("\n");
-      const highlighted = preserveWhitespace(highlightCode(rawCode, lang));
-      const langLabel = lang ? `<div style="color:#8ab4f8;font-size:12px;margin-bottom:6px;font-weight:bold;letter-spacing:1px;">🔤 ${escapeHtml(lang.toUpperCase())}</div>` : "";
+      const isCodeFence = !NON_CODE_LANGS.has(lang.toLowerCase().trim());
+
+      if (wechat && isCodeFence) {
+        // WeChat's own "插入代码" module (classes only; the article CSS does the styling):
+        // one <li> per line in the gutter, one <code> per line in the <pre>.
+        const codeLines = rawCode.split("\n");
+        const gutter = codeLines.map(() => "<li></li>").join("");
+        const body = codeLines
+          .map((line) => `<code><span leaf="">${preserveWhitespace(highlightCode(line, lang, true))}</span></code>`)
+          .join("");
+        htmlLines.push(
+          `<section class="code-snippet__fix code-snippet__js" style="margin:16px 0;">` +
+            `<ul class="code-snippet__line-index code-snippet__js">${gutter}</ul>` +
+            `<pre class="code-snippet__js" data-lang="${escapeHtml(lang.toLowerCase().trim())}">${body}</pre>` +
+            `</section>`
+        );
+        i++; // skip closing ```
+        continue;
+      }
+
+      // Formula/diagram fences in wechat mode, and all fences in styled/native mode.
+      // Only the styled mode highlights and labels code.
+      const highlighted = preserveWhitespace(
+        wechat || native ? escapeHtml(rawCode) : highlightCode(rawCode, lang)
+      );
+      const langLabel = !wechat && !native && lang
+        ? `<div style="color:#8ab4f8;font-size:12px;margin-bottom:6px;font-weight:bold;letter-spacing:1px;">🔤 ${escapeHtml(lang.toUpperCase())}</div>`
+        : "";
+      // Formula boxes in wechat mode use <p>, not <section>: the editor inserts an empty
+      // paragraph around block-level <section>s when it rewrites a draft, which shows up
+      // as the blank line above/below the box.
+      const tag = native ? "pre" : wechat ? "p" : "section";
       htmlLines.push(
-        `<section style="${WECHAT_CSS.pre}">${langLabel}<code style='${WECHAT_CSS.preCode}'>${highlighted}</code></section>`
+        `<${tag}${styleAttr(css.pre)}>${langLabel}<code${styleAttr(css.preCode)}>${highlighted}</code></${tag}>`
       );
       i++; // skip closing ```
       continue;
@@ -468,7 +606,7 @@ function parseMarkdown(md) {
 
     // ── Horizontal rule ────────────────────────────────
     if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line.trim())) {
-      htmlLines.push(`<hr style="${WECHAT_CSS.hr}">`);
+      htmlLines.push(`<hr${styleAttr(css.hr)}>`);
       i++;
       continue;
     }
@@ -480,7 +618,7 @@ function parseMarkdown(md) {
         tableRows.push(lines[i].trim());
         i++;
       }
-      htmlLines.push(renderTable(tableRows));
+      htmlLines.push(renderTable(tableRows, css, Boolean(native)));
       continue;
     }
 
@@ -491,8 +629,8 @@ function parseMarkdown(md) {
         quoteLines.push(lines[i].replace(/^>\s?/, ""));
         i++;
       }
-      const quoteContent = quoteLines.map(l => `<p style="margin:4px 0;">${renderInline(l)}</p>`).join("");
-      htmlLines.push(`<blockquote style="${WECHAT_CSS.blockquote}">${quoteContent}</blockquote>`);
+      const quoteContent = quoteLines.map(l => `<p${styleAttr(native ? "" : "margin:4px 0;")}>${inline(l)}</p>`).join("");
+      htmlLines.push(`<blockquote${styleAttr(css.blockquote)}>${quoteContent}</blockquote>`);
       continue;
     }
 
@@ -503,8 +641,8 @@ function parseMarkdown(md) {
         listItems.push(lines[i].replace(/^[\s]*[-*+]\s/, ""));
         i++;
       }
-      const items = listItems.map(li => `<li style="${WECHAT_CSS.li}">${renderInline(li)}</li>`).join("");
-      htmlLines.push(`<ul style="${WECHAT_CSS.ul}">${items}</ul>`);
+      const items = listItems.map(li => `<li${styleAttr(css.li)}>${inline(li)}</li>`).join("");
+      htmlLines.push(`<ul${styleAttr(css.ul)}>${items}</ul>`);
       continue;
     }
 
@@ -515,26 +653,26 @@ function parseMarkdown(md) {
         listItems.push(lines[i].replace(/^\s*\d+[.)]\s/, ""));
         i++;
       }
-      const items = listItems.map(li => `<li style="${WECHAT_CSS.li}">${renderInline(li)}</li>`).join("");
-      htmlLines.push(`<ol style="${WECHAT_CSS.ol}">${items}</ol>`);
+      const items = listItems.map(li => `<li${styleAttr(css.li)}>${inline(li)}</li>`).join("");
+      htmlLines.push(`<ol${styleAttr(css.ol)}>${items}</ol>`);
       continue;
     }
 
     // ── Headings ──────────────────────────────────────
     if (/^####\s/.test(line)) {
-      htmlLines.push(`<h4 style="${WECHAT_CSS.h4}">${renderInline(line.replace(/^####\s/, ""))}</h4>`);
+      htmlLines.push(`<h4${styleAttr(css.h4)}>${inline(line.replace(/^####\s/, ""))}</h4>`);
       i++; continue;
     }
     if (/^###\s/.test(line)) {
-      htmlLines.push(`<h3 style="${WECHAT_CSS.h3}">${renderInline(line.replace(/^###\s/, ""))}</h3>`);
+      htmlLines.push(`<h3${styleAttr(css.h3)}>${inline(line.replace(/^###\s/, ""))}</h3>`);
       i++; continue;
     }
     if (/^##\s/.test(line)) {
-      htmlLines.push(`<h2 style="${WECHAT_CSS.h2}">${renderInline(line.replace(/^##\s/, ""))}</h2>`);
+      htmlLines.push(`<h2${styleAttr(css.h2)}>${inline(line.replace(/^##\s/, ""))}</h2>`);
       i++; continue;
     }
     if (/^#\s/.test(line)) {
-      htmlLines.push(`<h1 style="${WECHAT_CSS.h1}">${renderInline(line.replace(/^#\s/, ""))}</h1>`);
+      htmlLines.push(`<h1${styleAttr(css.h1)}>${inline(line.replace(/^#\s/, ""))}</h1>`);
       i++; continue;
     }
 
@@ -553,16 +691,24 @@ function parseMarkdown(md) {
       i++;
     }
     const paraText = paraLines.join("\n");
-    const rendered = renderInline(paraText).replace(/\n/g, "<br>");
-    htmlLines.push(`<p style="${WECHAT_CSS.p}">${rendered}</p>`);
+    const rendered = inline(paraText).replace(/\n/g, "<br>");
+    // A formula box directly after this paragraph must not leave a blank line: drop the
+    // paragraph's bottom margin when the next non-blank line opens a text/plain fence.
+    let ahead = i;
+    while (ahead < lines.length && lines[ahead].trim() === "") ahead++;
+    const nextFence = ahead < lines.length && /^```/.test(lines[ahead].trim());
+    const nextLang = nextFence ? lines[ahead].trim().slice(3).trim().toLowerCase() : "";
+    const tightAbove = wechat && nextFence && NON_CODE_LANGS.has(nextLang);
+    htmlLines.push(`<p${styleAttr(tightAbove ? "margin:0;" : css.p)}>${rendered}</p>`);
   }
 
   return htmlLines.join("\n");
 }
 
-function renderTable(rows) {
+function renderTable(rows, css, native) {
+  const inline = (text) => renderInline(text, css, native);
   if (rows.length < 2) {
-    return `<p style="${WECHAT_CSS.p}">${renderInline(rows.join("<br>"))}</p>`;
+    return `<p${styleAttr(css.p)}>${inline(rows.join("<br>"))}</p>`;
   }
 
   const headerCells = rows[0]
@@ -570,21 +716,22 @@ function renderTable(rows) {
   const bodyRows = rows.slice(2);
 
   const theadCells = headerCells
-    .map(c => `<th style="${WECHAT_CSS.th}">${renderInline(c)}</th>`).join("");
+    .map(c => `<th${styleAttr(css.th)}>${inline(c)}</th>`).join("");
   const thead = `<thead><tr>${theadCells}</tr></thead>`;
 
   const tbodyRows = bodyRows
     .map((row, idx) => {
       const cells = row
         .replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
-      const bgStyle = idx % 2 === 0 ? WECHAT_CSS.trEven : WECHAT_CSS.trOdd;
+      const bgStyle = idx % 2 === 0 ? css.trEven : css.trOdd;
+      const cellStyle = native ? css.td : [css.td, bgStyle].filter(Boolean).join("");
       const tdCells = cells
-        .map(c => `<td style="${WECHAT_CSS.td};${bgStyle}">${renderInline(c)}</td>`).join("");
+        .map(c => `<td${styleAttr(cellStyle)}>${inline(c)}</td>`).join("");
       return `<tr>${tdCells}</tr>`;
     }).join("");
   const tbody = `<tbody>${tbodyRows}</tbody>`;
 
-  return `<table style="${WECHAT_CSS.table}">${thead}${tbody}</table>`;
+  return `<table${styleAttr(css.table)}>${thead}${tbody}</table>`;
 }
 
 function buildPage(title, bodyHtml) {

@@ -262,7 +262,9 @@ function checkBriefs(cfg: PublishConfig, articles: Article[], skip: boolean): st
   for (const a of articles) {
     const brief = cfg.briefs[a.no]?.trim() ?? '';
     if (!brief) {
-      problems.push(`${a.no} has no brief configured`);
+      // --skip-brief-check must also cover missing briefs, otherwise the flag cannot
+      // be used to create drafts first and fill the summaries later.
+      if (!skip) problems.push(`${a.no} has no brief configured`);
       continue;
     }
     const p = briefProblem(brief);

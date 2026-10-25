@@ -49,7 +49,13 @@ node src/publish/publish.ts juejin <config> --sync          # after editing brie
 node src/publish/publish.ts wechat <config> --list
 node src/publish/publish.ts wechat <config> --build         # offline preview in .wechat-out/
 node src/publish/publish.ts wechat <config> --drafts --yes
+node src/publish/publish.ts wechat <config> --tidy          # fallback: strip blanks around code blocks
 ```
+
+The `wechat` renderer emits no outer wrapper `<div>`: the editor unwraps one when it
+rewrites a draft and inserts blank paragraphs around the code sections while doing so.
+If a draft still shows those blanks (older content, or a future editor change),
+`--tidy` removes them through the API.
 
 WeChat has no publish API for personal accounts — the tool stops at the draft box and the last step happens in the WeChat backend. WeChat covers upload automatically. Juejin has no image-upload API, so its cover is set by hand once on the first draft and read back for the rest.
 

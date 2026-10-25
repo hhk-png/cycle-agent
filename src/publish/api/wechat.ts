@@ -428,6 +428,64 @@ export async function listDrafts(
   return { ok: true, data: out.filter((d) => d.mediaId) };
 }
 
+/** Full draft (including body HTML), for post-editor cleanup such as --tidy */
+export interface DraftDetail {
+  title: string;
+  content: string;
+  digest: string;
+  thumbMediaId: string;
+  author: string;
+  contentSourceUrl: string;
+}
+
+/** Read one draft's full content (read-only) */
+export async function getDraft(
+  mediaId: string,
+  opts: WechatOptions,
+  hooks: WechatHooks = {},
+): Promise<WechatResult<DraftDetail>> {
+  const tokenRes = await getAccessToken(opts, hooks);
+  if (!tokenRes.ok) return tokenRes;
+
+  debug(hooks, `POST /cgi-bin/draft/get media_id=${mediaId}`);
+  const res = await request<
+    Envelope & {
+      news_item?: {
+        title?: string;
+        content?: string;
+        digest?: string;
+        thumb_media_id?: string;
+        author?: string;
+        content_source_url?: string;
+      }[];
+    }
+  >(
+    `${BASE}/cgi-bin/draft/get?access_token=${tokenRes.data}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ media_id: mediaId }),
+    },
+    opts,
+    1,
+    hooks,
+  );
+  if (!res.ok) return res;
+  const item = res.data.news_item?.[0];
+  if (!item) return { ok: false, errMsg: 'The draft came back with no news_item', kind: 'api', errCode: 0 };
+  return {
+    ok: true,
+    data: {
+      title: item.title ?? '',
+      content: item.content ?? '',
+      digest: item.digest ?? '',
+      thumbMediaId: item.thumb_media_id ?? '',
+      author: item.author ?? '',
+      contentSourceUrl: item.content_source_url ?? '',
+    },
+  };
+}
+
 // ============ Helpers ============
 
 /** Look up the public egress IP (for whitelist setup); third-party echo, only in this explicit command */
