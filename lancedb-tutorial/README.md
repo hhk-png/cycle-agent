@@ -47,65 +47,65 @@ pip install lancedb pyarrow
 
 **导读与上手**
 
-- [第 0 章　导读：这份教程怎么读](00-preface.md)
-- [第 1 章　为什么需要 LanceDB](01-why-lancedb.md)
-- [第 2 章　上手：一个最小的完整流程](02-quickstart.md)
+- [第 0 章　导读：这份教程怎么读](lancedb教程-00-导读-这份教程怎么读.md)
+- [第 1 章　为什么需要 LanceDB](lancedb教程-01-为什么需要LanceDB.md)
+- [第 2 章　上手：一个最小的完整流程](lancedb教程-02-上手-一个最小的完整流程.md)
 
 **存储层：字节、文件、版本**
 
-- [第 3 章　Lance 文件格式](03-lance-file-format.md)
-- [第 4 章　列式编码与压缩](04-columnar-encoding.md)
-- [第 5 章　数据模型与 Schema](05-data-model.md)
-- [第 6 章　存储抽象与对象存储](06-storage-layer.md)
-- [第 7 章　版本 manifest 与时间旅行](07-versioning.md)
-- [第 8 章　事务与并发](08-transactions.md)
+- [第 3 章　Lance 文件格式](lancedb教程-03-Lance文件格式.md)
+- [第 4 章　列式编码与压缩](lancedb教程-04-列式编码与压缩.md)
+- [第 5 章　数据模型与 Schema](lancedb教程-05-数据模型与Schema.md)
+- [第 6 章　存储抽象与对象存储](lancedb教程-06-存储抽象与对象存储.md)
+- [第 7 章　版本 manifest 与时间旅行](lancedb教程-07-版本manifest与时间旅行.md)
+- [第 8 章　事务与并发](lancedb教程-08-事务与并发.md)
 
 **数据操作**
 
-- [第 9 章　删除、更新与 upsert](09-delete-update-upsert.md)
-- [第 10 章　标量过滤与谓词下推](10-filter-and-pushdown.md)
-- [第 11 章　表达式引擎](11-expression-engine.md)
+- [第 9 章　删除、更新与 upsert](lancedb教程-09-删除、更新与upsert.md)
+- [第 10 章　标量过滤与谓词下推](lancedb教程-10-标量过滤与谓词下推.md)
+- [第 11 章　表达式引擎](lancedb教程-11-表达式引擎.md)
 
 **索引**
 
-- [第 12 章　向量索引总览](12-vector-index-overview.md)
-- [第 13 章　IVF 与 k-means](13-ivf.md)
-- [第 14 章　乘积量化](14-pq.md)
-- [第 15 章　HNSW](15-hnsw.md)
-- [第 16 章　标量量化与二值量化](16-sq-bq.md)
-- [第 17 章　全文检索与 BM25](17-full-text-search.md)
-- [第 18 章　标量索引与 data skipping](18-scalar-indexes.md)
+- [第 12 章　向量索引总览](lancedb教程-12-向量索引总览.md)
+- [第 13 章　IVF 与 k-means](lancedb教程-13-IVF与k-means.md)
+- [第 14 章　乘积量化](lancedb教程-14-乘积量化.md)
+- [第 15 章　HNSW](lancedb教程-15-HNSW.md)
+- [第 16 章　标量量化与二值量化](lancedb教程-16-标量量化与二值量化.md)
+- [第 17 章　全文检索与 BM25](lancedb教程-17-全文检索与BM25.md)
+- [第 18 章　标量索引与 data skipping](lancedb教程-18-标量索引与data-skipping.md)
 
 **查询与检索**
 
-- [第 19 章　查询规划与执行](19-query-planning.md)
-- [第 20 章　混合检索与重排](20-hybrid-and-rerank.md)
-- [第 21 章　多向量与多模态](21-multivector-multimodal.md)
-- [第 22 章　嵌入函数](22-embedding-functions.md)
+- [第 19 章　查询规划与执行](lancedb教程-19-查询规划与执行.md)
+- [第 20 章　混合检索与重排](lancedb教程-20-混合检索与重排.md)
+- [第 21 章　多向量与多模态](lancedb教程-21-多向量与多模态.md)
+- [第 22 章　嵌入函数](lancedb教程-22-嵌入函数.md)
 
 **运维、生态与未来**
 
-- [第 23 章　压实与维护](23-compaction-maintenance.md)
-- [第 24 章　性能调优](24-performance-tuning.md)
-- [第 25 章　生产实践](25-production.md)
-- [第 26 章　生态与集成](26-ecosystem.md)
-- [第 27 章　竞品对比](27-comparison.md)
-- [第 28 章　版本号与路线图](28-versions-roadmap.md)
-- [第 29 章　未来方向](29-future.md)
+- [第 23 章　压实与维护](lancedb教程-23-压实与维护.md)
+- [第 24 章　性能调优](lancedb教程-24-性能调优.md)
+- [第 25 章　生产实践](lancedb教程-25-生产实践.md)
+- [第 26 章　生态与集成](lancedb教程-26-生态与集成.md)
+- [第 27 章　竞品对比](lancedb教程-27-竞品对比.md)
+- [第 28 章　版本号与路线图](lancedb教程-28-版本号与路线图.md)
+- [第 29 章　未来方向](lancedb教程-29-未来方向.md)
 
 **附录**
 
-- [附录 A　API 速查表](30-appendix-api.md)
-- [附录 B　术语表](31-appendix-glossary.md)
-- [附录 C　迷你实现代码导读](32-appendix-from-mini-to-real.md)
-- [附录 D　坑与常见问题](33-appendix-pitfalls.md)
-- [附录 E　怎么验证一个存储引擎](34-appendix-verification.md)
-- [附录 F　物化视图与派生数据](35-appendix-materialized-views.md)
-- [附录 G　运行时面：异步、作业与写路径](36-appendix-runtime-surface.md)
-- [附录 H　摄入路径：从数据源到一次提交](37-appendix-ingestion.md)
-- [附录 I　执行引擎：计划之后发生了什么](38-appendix-execution-engine.md)
-- [附录 J　互操作：零拷贝、C Data Interface 与格式层边界](39-appendix-interop.md)
-- [附录 K　失败与重试：哪些错误该重试，哪些重试只会更糟](40-appendix-failure-and-retry.md)
+- [附录 A　API 速查表](lancedb教程-30-附录A-API速查表.md)
+- [附录 B　术语表](lancedb教程-31-附录B-术语表.md)
+- [附录 C　迷你实现代码导读](lancedb教程-32-附录C-迷你实现代码导读.md)
+- [附录 D　坑与常见问题](lancedb教程-33-附录D-坑与常见问题.md)
+- [附录 E　怎么验证一个存储引擎](lancedb教程-34-附录E-怎么验证一个存储引擎.md)
+- [附录 F　物化视图与派生数据](lancedb教程-35-附录F-物化视图与派生数据.md)
+- [附录 G　运行时面：异步、作业与写路径](lancedb教程-36-附录G-运行时面-异步、作业与写路径.md)
+- [附录 H　摄入路径：从数据源到一次提交](lancedb教程-37-附录H-摄入路径-从数据源到一次提交.md)
+- [附录 I　执行引擎：计划之后发生了什么](lancedb教程-38-附录I-执行引擎-计划之后发生了什么.md)
+- [附录 J　互操作：零拷贝、C Data Interface 与格式层边界](lancedb教程-39-附录J-互操作-零拷贝、C-Data-Interface与格式层边界.md)
+- [附录 K　失败与重试：哪些错误该重试，哪些重试只会更糟](lancedb教程-40-附录K-失败与重试-哪些错误该重试，哪些重试只会更糟.md)
 
 附录 F 到 K 补的是正文结构里空着的六层，
 它们要么在 0.40 里已经**发布**、要么就是执行路径本身的一段，
@@ -171,7 +171,7 @@ pip install lancedb pyarrow
 ```
 lancedb-tutorial/
   README.md              本文件
-  00-preface.md …        教程正文（第 0–29 章 + 11 篇附录，共约 2.8 万行）
+  lancedb教程-00-导读-这份教程怎么读.md …        教程正文（第 0–29 章 + 11 篇附录，共约 2.8 万行）
   mini_lancedb/          迷你实现（纯 Python + numpy，约 3.6 万行）
   tests/                 测试套件（1144 个用例，约 1.1 万行）
   examples/              可以直接跑的示例脚本

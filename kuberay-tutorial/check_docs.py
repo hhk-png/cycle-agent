@@ -30,7 +30,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent
 FACTS_PATH = ROOT / "docs" / "facts.json"
-CHAPTER_RE = re.compile(r"^(\d{2})-[a-z0-9-]+\.md$")
+CHAPTER_RE = re.compile(r"^kuberay教程-(\d{2})-(?!附录)[^/]*\.md$")
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 CODE_PATH_RE = re.compile(r"`((?:minikuberay|manifests|examples|tests|scripts)/[^`\n]+)`")
 FENCE_RE = re.compile(r"```(yaml|yml)\n(.*?)```", re.S)

@@ -138,117 +138,117 @@ python examples/k8s_primitives_lab.py
 
 ### 第一部分：背景与架构
 
-1. [为什么需要 KubeRay](01-why-kuberay.md)
-2. [Ray 运行时架构回顾](02-ray-architecture.md)
-3. [Kubernetes Operator 模式](03-kubernetes-operator.md)
-4. [KubeRay 总览：组件、版本与生态](04-kuberay-overview.md)
+1. [为什么需要 KubeRay](kuberay教程-01-为什么需要KubeRay.md)
+2. [Ray 运行时架构回顾](kuberay教程-02-Ray运行时架构回顾.md)
+3. [Kubernetes Operator 模式](kuberay教程-03-Kubernetes-Operator模式.md)
+4. [KubeRay 总览：组件、版本与生态](kuberay教程-04-KubeRay总览-组件、版本与生态.md)
 
 ### 第二部分：CRD 与运行时
 
-5. [RayCluster CRD 深度解析](05-raycluster-crd.md)
-6. [Pod、网络、存储与调度](06-pods-networking-storage.md)
-7. [控制器调和循环：从 CR 到 Pod](07-controller-reconcile.md)
-8. [状态、条件、事件与可观测性](08-observability.md)
+5. [RayCluster CRD 深度解析](kuberay教程-05-RayCluster-CRD深度解析.md)
+6. [Pod、网络、存储与调度](kuberay教程-06-Pod、网络、存储与调度.md)
+7. [控制器调和循环：从 CR 到 Pod](kuberay教程-07-控制器调和循环-从CR到Pod.md)
+8. [状态、条件、事件与可观测性](kuberay教程-08-状态、条件、事件与可观测性.md)
 
 ### 第三部分：工作负载与生产
 
-9. [自动扩缩容：Ray Autoscaler 与 KubeRay](09-autoscaling.md)
-10. [RayJob：提交模式、生命周期与清理](10-rayjob.md)
-11. [RayService：Serve、零停机升级与流量切换](11-rayservice.md)
-12. [RayCronJob 与批调度生态](12-raycronjob-batch.md)
-13. [高可用、容错与 GCS FT](13-ha-fault-tolerance.md)
-14. [安全：RBAC、网络、Secret、mTLS 与多租户](14-security.md)
-15. [性能、容量与成本](15-performance-cost.md)
+9. [自动扩缩容：Ray Autoscaler 与 KubeRay](kuberay教程-09-自动扩缩容-Ray-Autoscaler与KubeRay.md)
+10. [RayJob：提交模式、生命周期与清理](kuberay教程-10-RayJob-提交模式、生命周期与清理.md)
+11. [RayService：Serve、零停机升级与流量切换](kuberay教程-11-RayService-Serve、零停机升级与流量切换.md)
+12. [RayCronJob 与批调度生态](kuberay教程-12-RayCronJob与批调度生态.md)
+13. [高可用、容错与 GCS FT](kuberay教程-13-高可用、容错与GCS-FT.md)
+14. [安全：RBAC、网络、Secret、mTLS 与多租户](kuberay教程-14-安全-RBAC、网络、Secret、mTLS与多租户.md)
+15. [性能、容量与成本](kuberay教程-15-性能、容量与成本.md)
 
 ### 第四部分：运维与未来
 
-16. [KubeRay APIServer、Dashboard 与 kubectl-ray](16-apiserver-dashboard-cli.md)
-17. [生产运行手册](17-production-runbook.md)
-18. [未来方向：Roadmap 与生态趋势](18-future.md)
+16. [KubeRay APIServer、Dashboard 与 kubectl-ray](kuberay教程-16-KubeRay-APIServer、Dashboard与kubectl-ray.md)
+17. [生产运行手册](kuberay教程-17-生产运行手册.md)
+18. [未来方向：Roadmap 与生态趋势](kuberay教程-18-未来方向-Roadmap与生态趋势.md)
 
 ### 第五部分：简版 KubeRay 实现
 
-19. [MiniKubeRay 架构与设计取舍](19-mini-architecture.md)
-20. [实现：API 模型、默认值、校验与 Store](20-mini-api-store.md)
-21. [实现：控制器、调度器、Kubelet 与自动扩缩容](21-mini-controllers.md)
-22. [实现：RayJob、RayService 与 RayCronJob](22-mini-jobs-services.md)
-23. [实现：APIServer、Dashboard、CLI 与指标](23-mini-apiserver-cli.md)
-24. [测试、验证与故障注入](24-testing-verification.md)
-25. [练习、扩展路线与真实 KubeRay 的差距](25-roadmap-exercises.md)
+19. [MiniKubeRay 架构与设计取舍](kuberay教程-19-MiniKubeRay架构与设计取舍.md)
+20. [实现：API 模型、默认值、校验与 Store](kuberay教程-20-实现-API模型、默认值、校验与Store.md)
+21. [实现：控制器、调度器、Kubelet 与自动扩缩容](kuberay教程-21-实现-控制器、调度器、Kubelet与自动扩缩容.md)
+22. [实现：RayJob、RayService 与 RayCronJob](kuberay教程-22-实现-RayJob、RayService与RayCronJob.md)
+23. [实现：APIServer、Dashboard、CLI 与指标](kuberay教程-23-实现-APIServer、Dashboard、CLI与指标.md)
+24. [测试、验证与故障注入](kuberay教程-24-测试、验证与故障注入.md)
+25. [练习、扩展路线与真实 KubeRay 的差距](kuberay教程-25-练习、扩展路线与真实KubeRay的差距.md)
 
 ### 第六部分：真实集群与进阶专题
 
-26. [真实集群实验：从 kind 到第一个 RayService](26-real-cluster-lab.md)
-27. [在 KubeRay 上运行 Ray Train / Data / Tune / RLlib](27-ray-train-data-tune.md)
-28. [LLM 推理平台：Ray Serve、vLLM 与 SGLang](28-llm-serving.md)
-29. [生态集成：队列、调度与工作流](29-ecosystem-integrations.md)
-30. [KubeRay 源码导读与二次开发](30-source-code-tour.md)
-31. [升级、迁移、离线安装与灾难恢复](31-upgrade-migration-dr.md)
-32. [平台实战：多租户 Ray 平台设计](32-platform-capstone.md)
-33. [MiniKubeRay 进阶实现：History Server、Gateway API 与批调度](33-mini-advanced-implementation.md)
+26. [真实集群实验：从 kind 到第一个 RayService](kuberay教程-26-真实集群实验-从kind到第一个RayService.md)
+27. [在 KubeRay 上运行 Ray Train / Data / Tune / RLlib](kuberay教程-27-在KubeRay上运行Ray-Train-Data-Tune-RLlib.md)
+28. [LLM 推理平台：Ray Serve、vLLM 与 SGLang](kuberay教程-28-LLM推理平台-Ray-Serve、vLLM与SGLang.md)
+29. [生态集成：队列、调度与工作流](kuberay教程-29-生态集成-队列、调度与工作流.md)
+30. [KubeRay 源码导读与二次开发](kuberay教程-30-KubeRay源码导读与二次开发.md)
+31. [升级、迁移、离线安装与灾难恢复](kuberay教程-31-升级、迁移、离线安装与灾难恢复.md)
+32. [平台实战：多租户 Ray 平台设计](kuberay教程-32-平台实战-多租户Ray平台设计.md)
+33. [MiniKubeRay 进阶实现：History Server、Gateway API 与批调度](kuberay教程-33-MiniKubeRay进阶实现-History-Server、Gateway-API与批调度.md)
 
 ### 第七部分：深入原理与工程实践
 
-34. [Autoscaler v2 内部机制与容量模型](34-autoscaler-v2-internals.md)
-35. [Ray 运行时深潜：GCS、Raylet、对象存储与调度](35-ray-runtime-internals.md)
-36. [GPU 与异构资源调度：device plugin、MIG、DRA 与拓扑](36-gpu-heterogeneous-scheduling.md)
-37. [生产故障案例与复盘](37-production-incident-postmortems.md)
-38. [从 MiniKubeRay 到生产 Operator：移植与二次开发](38-porting-to-production-operator.md)
-39. [选型与替代方案：KubeRay、托管 Ray、Slurm 与其他系统](39-selection-alternatives.md)
+34. [Autoscaler v2 内部机制与容量模型](kuberay教程-34-Autoscaler-v2内部机制与容量模型.md)
+35. [Ray 运行时深潜：GCS、Raylet、对象存储与调度](kuberay教程-35-Ray运行时深潜-GCS、Raylet、对象存储与调度.md)
+36. [GPU 与异构资源调度：device plugin、MIG、DRA 与拓扑](kuberay教程-36-GPU与异构资源调度-device-plugin、MIG、DRA与拓扑.md)
+37. [生产故障案例与复盘](kuberay教程-37-生产故障案例与复盘.md)
+38. [从 MiniKubeRay 到生产 Operator：移植与二次开发](kuberay教程-38-从MiniKubeRay到生产Operator-移植与二次开发.md)
+39. [选型与替代方案：KubeRay、托管 Ray、Slurm 与其他系统](kuberay教程-39-选型与替代方案-KubeRay、托管Ray、Slurm与其他系统.md)
 
 ### 第八部分：网络、规模化与工程化
 
-40. [Kubernetes 网络深潜：CNI、DNS、Service、NetworkPolicy 与 mTLS](40-kubernetes-network-internals.md)
-41. [控制面规模化与多集群运营：从 10 到 1000 个 RayCluster](41-control-plane-at-scale.md)
-42. [可运行故障实验室：用 MiniKubeRay 复现生产事故](42-incident-lab.md)
-43. [从 Issue 到 Release：KubeRay 贡献、API 治理与发布工程](43-contribution-release-engineering.md)
+40. [Kubernetes 网络深潜：CNI、DNS、Service、NetworkPolicy 与 mTLS](kuberay教程-40-Kubernetes网络深潜-CNI、DNS、Service、NetworkPolicy与mTLS.md)
+41. [控制面规模化与多集群运营：从 10 到 1000 个 RayCluster](kuberay教程-41-控制面规模化与多集群运营-从10到1000个RayCluster.md)
+42. [可运行故障实验室：用 MiniKubeRay 复现生产事故](kuberay教程-42-可运行故障实验室-用MiniKubeRay复现生产事故.md)
+43. [从 Issue 到 Release：KubeRay 贡献、API 治理与发布工程](kuberay教程-43-从Issue到Release-KubeRay贡献、API治理与发布工程.md)
 
 ### 第九部分：跨故障域与托管平台
 
-44. [多可用区、托管 Kubernetes 与灾难恢复](44-multi-az-managed-kubernetes-dr.md)
+44. [多可用区、托管 Kubernetes 与灾难恢复](kuberay教程-44-多可用区、托管Kubernetes与灾难恢复.md)
 
 ### 第十部分：数据、训练与推理深水区
 
-45. [Ray Data 执行引擎深潜：流式调度、背压、Shuffle 与对象存储](45-ray-data-execution-engine.md)
-46. [弹性分布式训练：Ray Train、TorchElastic、Checkpoint 与故障恢复](46-elastic-distributed-training.md)
-47. [LLM 推理内部机制：Continuous Batching、KV Cache、前缀缓存与 PD 分离](47-llm-inference-internals.md)
+45. [Ray Data 执行引擎深潜：流式调度、背压、Shuffle 与对象存储](kuberay教程-45-Ray-Data执行引擎深潜-流式调度、背压、Shuffle与对象存储.md)
+46. [弹性分布式训练：Ray Train、TorchElastic、Checkpoint 与故障恢复](kuberay教程-46-弹性分布式训练-Ray-Train、TorchElastic、Checkpoint与故障恢复.md)
+47. [LLM 推理内部机制：Continuous Batching、KV Cache、前缀缓存与 PD 分离](kuberay教程-47-LLM推理内部机制-Continuous-Batching、KV-Cache、前缀缓存与PD分离.md)
 
 ### 第十一部分：可观测性、治理与平台闭环
 
-48. [可观测性 2.0：OpenTelemetry、日志管道、SLO 与错误预算](48-observability-2.md)
-49. [平台治理：准入控制、策略即代码与供应链安全](49-platform-governance-supply-chain.md)
-50. [数据与模型治理：Schema、血缘、Point-in-Time 特征与模型注册](50-data-model-governance.md)
+48. [可观测性 2.0：OpenTelemetry、日志管道、SLO 与错误预算](kuberay教程-48-可观测性2.0-OpenTelemetry、日志管道、SLO与错误预算.md)
+49. [平台治理：准入控制、策略即代码与供应链安全](kuberay教程-49-平台治理-准入控制、策略即代码与供应链安全.md)
+50. [数据与模型治理：Schema、血缘、Point-in-Time 特征与模型注册](kuberay教程-50-数据与模型治理-Schema、血缘、Point-in-Time特征与模型注册.md)
 
 ### 第十二部分：弹性、生命周期、开发者体验与 Operator 可靠性
 
-51. [Kubernetes 弹性伸缩栈：从 Pending Pod 到节点池](51-kubernetes-elasticity-stack.md)
-52. [生命周期、驱逐与优雅终止](52-graceful-termination-disruption.md)
-53. [交互式开发与 Notebook 平台](53-interactive-dev-notebooks.md)
-54. [Operator 可靠性与控制面 SLO](54-operator-reliability-control-plane-slo.md)
+51. [Kubernetes 弹性伸缩栈：从 Pending Pod 到节点池](kuberay教程-51-Kubernetes弹性伸缩栈-从Pending-Pod到节点池.md)
+52. [生命周期、驱逐与优雅终止](kuberay教程-52-生命周期、驱逐与优雅终止.md)
+53. [交互式开发与 Notebook 平台](kuberay教程-53-交互式开发与Notebook平台.md)
+54. [Operator 可靠性与控制面 SLO](kuberay教程-54-Operator可靠性与控制面SLO.md)
 
 ### 第十三部分：变更管理与活体诊断
 
-55. [变更管理：升级、重启与不丢状态](55-change-management-upgrades.md)
-56. [Ray 活体诊断：State API、ray CLI 与证据链](56-live-diagnostics-state-api.md)
+55. [变更管理：升级、重启与不丢状态](kuberay教程-55-变更管理-升级、重启与不丢状态.md)
+56. [Ray 活体诊断：State API、ray CLI 与证据链](kuberay教程-56-Ray活体诊断-State-API、ray-CLI与证据链.md)
 
 ### 第十四部分：垂直弹性与 Kubernetes 新原语
 
-57. [垂直弹性：KubeRay IPPR 与原地 Pod 扩缩](57-in-place-pod-resizing-ippr.md)
-58. [Kubernetes 新原语与 KubeRay：原生 sidecar、调度门、拓扑感知与 Pod 级资源](58-kubernetes-primitives.md)
+57. [垂直弹性：KubeRay IPPR 与原地 Pod 扩缩](kuberay教程-57-垂直弹性-KubeRay-IPPR与原地Pod扩缩.md)
+58. [Kubernetes 新原语与 KubeRay：原生 sidecar、调度门、拓扑感知与 Pod 级资源](kuberay教程-58-Kubernetes新原语与KubeRay-原生sidecar、调度门、拓扑感知与Pod级资源.md)
 
 ### 附录
 
-- [A. API 字段速查](appendix-a-api-reference.md)
-- [B. 端口、指标与环境变量](appendix-b-ports-metrics-env.md)
-- [C. 故障排查手册](appendix-c-troubleshooting.md)
-- [D. 术语表](appendix-d-glossary.md)
-- [E. 参考资料](appendix-e-references.md)
-- [F. 真实集群实验命令速查](appendix-f-lab-cheatsheet.md)
-- [G. Helm Values 与安装矩阵](appendix-g-helm-values.md)
-- [H. 事件、错误与状态码目录](appendix-h-events-errors-status.md)
-- [I. 自测题与答案](appendix-i-self-assessment.md)
-- [J. 端到端时序图集](appendix-j-sequence-atlas.md)
-- [K. 可运行实验与验证索引](appendix-k-lab-index.md)
+- [A. API 字段速查](kuberay教程-59-附录A-API字段速查.md)
+- [B. 端口、指标与环境变量](kuberay教程-60-附录B-端口、指标与环境变量.md)
+- [C. 故障排查手册](kuberay教程-61-附录C-故障排查手册.md)
+- [D. 术语表](kuberay教程-62-附录D-术语表.md)
+- [E. 参考资料](kuberay教程-63-附录E-参考资料.md)
+- [F. 真实集群实验命令速查](kuberay教程-64-附录F-真实集群实验命令速查.md)
+- [G. Helm Values 与安装矩阵](kuberay教程-65-附录G-Helm-Values与安装矩阵.md)
+- [H. 事件、错误与状态码目录](kuberay教程-66-附录H-事件、错误与状态码目录.md)
+- [I. 自测题与答案](kuberay教程-67-附录I-自测题与答案.md)
+- [J. 端到端时序图集](kuberay教程-68-附录J-端到端时序图集.md)
+- [K. 可运行实验与验证索引](kuberay教程-69-附录K-可运行实验与验证索引.md)
 
 ## 章节依赖图
 
@@ -429,8 +429,8 @@ kuberay-tutorial/
 - **想处理节点容量/驱逐**：读 51、52，跑 `examples/elasticity_lab.py` 与 `examples/lifecycle_lab.py`。
 - **想安全升级/维护一个在线集群**：读 55，先跑 `examples/maintenance_lab.py`；重点理解 `Recreate`/`None`、spec hash 与 head 维护。
 - **想做 on-call 现场诊断**：读 56，跑 `examples/diagnosis_lab.py`，再用 `python -m minikuberay state ...` 对照 State API 的响应信封。
-- **想快速确认“现在还能跑吗”**：直接看[附录 K](appendix-k-lab-index.md)，五分钟跑完全量检查；每个命令都写了预期输出和失败排查入口。
-- **想理解一次操作经过哪些组件**：看[附录 J](appendix-j-sequence-atlas.md) 的时序图，再回到对应章节读细节。
+- **想快速确认“现在还能跑吗”**：直接看[附录 K](kuberay教程-69-附录K-可运行实验与验证索引.md)，五分钟跑完全量检查；每个命令都写了预期输出和失败排查入口。
+- **想理解一次操作经过哪些组件**：看[附录 J](kuberay教程-68-附录J-端到端时序图集.md) 的时序图，再回到对应章节读细节。
 - **想用垂直弹性**：读第 57 章，先跑 `examples/ippr_lab.py`；重点理解 `ray.io/ippr` 的八条前置校验、四步决策顺序和“只扩不缩”。
 - **想用 Kubernetes 新原语**：读第 58 章，跑 `examples/k8s_primitives_lab.py`；重点看原生 sidecar 的启动/退出顺序、`schedulingGates` 与 autoscaler 的交互、Pod 级资源与 Ray 探测的错位。
 
@@ -486,4 +486,4 @@ python examples/k8s_primitives_lab.py
 
 第 42 章的故障实验室是“失败路径的回归测试”：新增控制器行为时，优先加一个场景，而不是只加一个 happy-path 测试。第 41 章的基准是“规模回归”：对象数/写入数是确定性的，时间只做趋势。第 10/7/12/51/52 章的新实验是“生命周期回归”：它们用 UID、状态迁移、节点数和驱逐时序断言行为，而不是只打印日志。第 54 章把 operator 自身的 cache sync、选主和重试也纳入同样的确定性断言。
 
-完整的命令索引、预期输出与 CI 最小集合见[附录 K](appendix-k-lab-index.md)。
+完整的命令索引、预期输出与 CI 最小集合见[附录 K](kuberay教程-69-附录K-可运行实验与验证索引.md)。

@@ -27,70 +27,70 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CHAPTERS = [
-    "00-preface.md",
-    "01-why-inference-engine.md",
-    "02-deepinfer-overview.md",
-    "03-quickstart-source-map.md",
-    "04-performance-model.md",
-    "05-model-architecture-v41.md",
-    "06-attention-kv-compression.md",
-    "07-moe-expert-parallel.md",
-    "08-speculative-decoding.md",
-    "09-structured-output.md",
-    "10-low-precision-determinism.md",
-    "11-sampling-decoding.md",
-    "12-engine-architecture.md",
-    "13-scheduler.md",
-    "14-kv-cache-system.md",
-    "15-parallelism-communication.md",
-    "16-long-context-agent.md",
-    "17-async-cuda-graph-performance.md",
-    "18-gpu-kernels.md",
-    "19-reliability-operations.md",
-    "20-mini-design.md",
-    "21-mini-model-kernels.md",
-    "22-mini-paged-kv-scheduler.md",
-    "23-mini-speculative-structured.md",
-    "24-mini-eplb-parallel-kv.md",
-    "25-mini-http-observability.md",
-    "26-testing-validation.md",
-    "27-from-toy-to-production.md",
-    "28-security-privacy.md",
-    "29-evaluation-quality.md",
-    "30-inference-economics.md",
-    "31-competitive-landscape.md",
-    "32-deployment-tco.md",
-    "33-engineering-production.md",
-    "34-model-onboarding-versioning.md",
-    "35-cloud-native-kubernetes.md",
-    "36-productization-business.md",
-    "37-compliance-licensing-governance.md",
-    "38-multimodal-inference.md",
-    "39-reasoning-workloads.md",
-    "40-offline-batch-serving.md",
-    "41-multi-model-adapters.md",
-    "42-embedding-rerank.md",
-    "43-compiler-graph.md",
-    "44-rl-rollout.md",
-    "45-edge-heterogeneous.md",
-    "46-traffic-engineering.md",
-    "47-business-finance.md",
-    "48-market-sizing.md",
-    "49-valuation-financing.md",
-    "50-future-directions.md",
-    "51-conclusion.md",
+    "deepinfer教程-00-前言-如何读这本书.md",
+    "deepinfer教程-01-为什么需要推理框架.md",
+    "deepinfer教程-02-DeepInfer全景.md",
+    "deepinfer教程-03-快速上手与源码地图.md",
+    "deepinfer教程-04-推理系统的性能模型.md",
+    "deepinfer教程-05-DeepSeek-V4.1-Flash架构总览.md",
+    "deepinfer教程-06-注意力、KV压缩与有界重放.md",
+    "deepinfer教程-07-MoE与专家并行.md",
+    "deepinfer教程-08-推测解码DSpark.md",
+    "deepinfer教程-09-结构化输出.md",
+    "deepinfer教程-10-低精度、确定性与batch-invariance.md",
+    "deepinfer教程-11-采样、解码与输出契约.md",
+    "deepinfer教程-12-引擎总体架构.md",
+    "deepinfer教程-13-调度器.md",
+    "deepinfer教程-14-KV-cache系统.md",
+    "deepinfer教程-15-并行、通信与PD分离.md",
+    "deepinfer教程-16-长上下文与Agent负载工程.md",
+    "deepinfer教程-17-异步调度、CUDA-Graph与性能工程.md",
+    "deepinfer教程-18-GPU执行模型与kernel工程.md",
+    "deepinfer教程-19-可靠性、运维与容量规划.md",
+    "deepinfer教程-20-mini-deepinfer的设计与边界.md",
+    "deepinfer教程-21-玩具模型、Tokenizer与反向传播.md",
+    "deepinfer教程-22-分页KV与调度器实现.md",
+    "deepinfer教程-23-推测解码与结构化输出实现.md",
+    "deepinfer教程-24-EPLB、并行模拟与KV分层.md",
+    "deepinfer教程-25-HTTP服务与可观测性.md",
+    "deepinfer教程-26-测试、验证与性能实验.md",
+    "deepinfer教程-27-从玩具到生产.md",
+    "deepinfer教程-28-安全、隐私与多租户.md",
+    "deepinfer教程-29-评测体系与质量保证.md",
+    "deepinfer教程-30-推理经济学.md",
+    "deepinfer教程-31-竞争格局与开源战略.md",
+    "deepinfer教程-32-部署选型与TCO.md",
+    "deepinfer教程-33-工程化-从可运行到可维护.md",
+    "deepinfer教程-34-模型接入、权重管理与版本治理.md",
+    "deepinfer教程-35-云原生部署与Kubernetes.md",
+    "deepinfer教程-36-推理产品化与商业路径.md",
+    "deepinfer教程-37-合规、许可与供应链治理.md",
+    "deepinfer教程-38-多模态推理工程-从像素到token.md",
+    "deepinfer教程-39-推理模型与长思维链服务.md",
+    "deepinfer教程-40-离线批处理-吞吐型推理服务.md",
+    "deepinfer教程-41-多模型、多适配器与模型路由.md",
+    "deepinfer教程-42-Embedding、Rerank与检索推理.md",
+    "deepinfer教程-43-推理编译器与图优化.md",
+    "deepinfer教程-44-强化学习推理与rollout引擎.md",
+    "deepinfer教程-45-端侧、边缘与异构推理.md",
+    "deepinfer教程-46-流量工程、多区域与容量运营.md",
+    "deepinfer教程-47-商业分析进阶-现金流、定价与投资回报.md",
+    "deepinfer教程-48-商业分析-市场测算与进入策略.md",
+    "deepinfer教程-49-商业分析-估值、融资与资本回报.md",
+    "deepinfer教程-50-未来方向.md",
+    "deepinfer教程-51-结语与路线图.md",
 ]
 APPENDICES = [
-    "appendix-a-glossary.md",
-    "appendix-b-formulas.md",
-    "appendix-c-api-config.md",
-    "appendix-d-references.md",
-    "appendix-e-lab-manual.md",
-    "appendix-f-transformer-basics.md",
-    "appendix-g-request-lifecycle.md",
-    "appendix-h-exercise-answers.md",
-    "appendix-i-module-api-index.md",
-    "appendix-j-troubleshooting.md",
+    "deepinfer教程-52-附录A-术语表.md",
+    "deepinfer教程-53-附录B-公式与常数.md",
+    "deepinfer教程-54-附录C-API与配置参考.md",
+    "deepinfer教程-55-附录D-参考资料.md",
+    "deepinfer教程-56-附录E-实验手册与命令速查.md",
+    "deepinfer教程-57-附录F-Transformer推理基础.md",
+    "deepinfer教程-58-附录G-一个请求的完整生命周期.md",
+    "deepinfer教程-59-附录H-练习提示与参考答案.md",
+    "deepinfer教程-60-附录I-mini-deepinfer模块、API与测试矩阵.md",
+    "deepinfer教程-61-附录J-生产故障排查手册.md",
 ]
 EXPECTED = CHAPTERS + APPENDICES
 META_RE = re.compile(r"<!--\s*docs-meta:\s*(.*?)\s*-->")
@@ -179,7 +179,9 @@ def main() -> int:
         body = strip_fenced_code(text)
 
         # The filename, the H1 number and the section numbering must agree.
-        chapter_match = re.match(r"(\d+)-", filename)
+        chapter_match = (
+            re.match(r"deepinfer教程-(\d+)-", filename) if filename in CHAPTERS else None
+        )
         if chapter_match:
             number = int(chapter_match.group(1))
             title_match = re.match(r"# 第 (\d+) 章", first_line)
@@ -197,9 +199,13 @@ def main() -> int:
                 errors.append(
                     f"{filename}: section numbers are not contiguous: {sections[:8]}..."
                 )
-        appendix_match = re.match(r"appendix-([a-z])-", filename)
+        appendix_match = (
+            re.match(r"deepinfer教程-\d+-附录([A-Z])-", filename)
+            if filename in APPENDICES
+            else None
+        )
         if appendix_match:
-            letter = appendix_match.group(1).upper()
+            letter = appendix_match.group(1)
             title_match = re.match(r"# 附录 ([A-Z])", first_line)
             if not title_match:
                 errors.append(f"{filename}: H1 must start with '# 附录 X'")
@@ -273,13 +279,13 @@ def main() -> int:
     appendix_letters: set[str] = set()
     sections: set[tuple[int, int]] = set()
     for filename in CHAPTERS:
-        match = re.match(r"(\d+)-", filename)
+        match = re.match(r"deepinfer教程-(\d+)-", filename)
         if match:
             chapter_numbers.add(int(match.group(1)))
     for filename in APPENDICES:
-        match = re.match(r"appendix-([a-z])-", filename)
+        match = re.match(r"deepinfer教程-\d+-附录([A-Z])-", filename)
         if match:
-            appendix_letters.add(match.group(1).upper())
+            appendix_letters.add(match.group(1))
     for filename in CHAPTERS:
         path = ROOT / filename
         if not path.exists():

@@ -100,8 +100,8 @@ python -m mini_deepinfer.cli serve --port 8000
 ```text
 deepinfer-tutorial/
 ├── README.md
-├── 00-preface.md ... 51-conclusion.md   # 正文（52 章）
-├── appendix-a-glossary.md ...           # 附录（10 篇）
+├── deepinfer教程-00-前言-如何读这本书.md ... deepinfer教程-51-结语与路线图.md   # 正文（52 章）
+├── deepinfer教程-52-附录A-术语表.md ... deepinfer教程-61-附录J-生产故障排查手册.md   # 附录（10 篇）
 ├── mini_deepinfer/                      # 可运行的迷你引擎
 │   ├── engine.py                        # 调度 -> 执行 -> 采样 -> 回收
 │   ├── scheduler.py                     # 连续批处理、chunked prefill、抢占
@@ -153,98 +153,98 @@ deepinfer-tutorial/
 
 ### 第一部分：从模型到服务
 
-- [第 0 章 前言：如何读这本书](00-preface.md)
-- [第 1 章 为什么需要推理框架](01-why-inference-engine.md)
-- [第 2 章 DeepInfer 全景](02-deepinfer-overview.md)
-- [第 3 章 快速上手与源码地图](03-quickstart-source-map.md)
-- [第 4 章 推理系统的性能模型](04-performance-model.md)
+- [第 0 章 前言：如何读这本书](deepinfer教程-00-前言-如何读这本书.md)
+- [第 1 章 为什么需要推理框架](deepinfer教程-01-为什么需要推理框架.md)
+- [第 2 章 DeepInfer 全景](deepinfer教程-02-DeepInfer全景.md)
+- [第 3 章 快速上手与源码地图](deepinfer教程-03-快速上手与源码地图.md)
+- [第 4 章 推理系统的性能模型](deepinfer教程-04-推理系统的性能模型.md)
 
 ### 第二部分：模型、算法与数值
 
-- [第 5 章 DeepSeek-V4.1-Flash 架构总览](05-model-architecture-v41.md)
-- [第 6 章 注意力、KV 压缩与有界重放](06-attention-kv-compression.md)
-- [第 7 章 MoE 与专家并行](07-moe-expert-parallel.md)
-- [第 8 章 推测解码 DSpark](08-speculative-decoding.md)
-- [第 9 章 结构化输出](09-structured-output.md)
-- [第 10 章 低精度、确定性与 batch invariance](10-low-precision-determinism.md)
-- [第 11 章 采样、解码与输出契约](11-sampling-decoding.md)
+- [第 5 章 DeepSeek-V4.1-Flash 架构总览](deepinfer教程-05-DeepSeek-V4.1-Flash架构总览.md)
+- [第 6 章 注意力、KV 压缩与有界重放](deepinfer教程-06-注意力、KV压缩与有界重放.md)
+- [第 7 章 MoE 与专家并行](deepinfer教程-07-MoE与专家并行.md)
+- [第 8 章 推测解码 DSpark](deepinfer教程-08-推测解码DSpark.md)
+- [第 9 章 结构化输出](deepinfer教程-09-结构化输出.md)
+- [第 10 章 低精度、确定性与 batch invariance](deepinfer教程-10-低精度、确定性与batch-invariance.md)
+- [第 11 章 采样、解码与输出契约](deepinfer教程-11-采样、解码与输出契约.md)
 
 ### 第三部分：引擎内部
 
-- [第 12 章 引擎总体架构](12-engine-architecture.md)
-- [第 13 章 调度器](13-scheduler.md)
-- [第 14 章 KV cache 系统](14-kv-cache-system.md)
-- [第 15 章 并行、通信与 PD 分离](15-parallelism-communication.md)
-- [第 16 章 长上下文与 Agent 负载工程](16-long-context-agent.md)
-- [第 17 章 异步调度、CUDA Graph 与性能工程](17-async-cuda-graph-performance.md)
-- [第 18 章 GPU 执行模型与 kernel 工程](18-gpu-kernels.md)
-- [第 19 章 可靠性、运维与容量规划](19-reliability-operations.md)
+- [第 12 章 引擎总体架构](deepinfer教程-12-引擎总体架构.md)
+- [第 13 章 调度器](deepinfer教程-13-调度器.md)
+- [第 14 章 KV cache 系统](deepinfer教程-14-KV-cache系统.md)
+- [第 15 章 并行、通信与 PD 分离](deepinfer教程-15-并行、通信与PD分离.md)
+- [第 16 章 长上下文与 Agent 负载工程](deepinfer教程-16-长上下文与Agent负载工程.md)
+- [第 17 章 异步调度、CUDA Graph 与性能工程](deepinfer教程-17-异步调度、CUDA-Graph与性能工程.md)
+- [第 18 章 GPU 执行模型与 kernel 工程](deepinfer教程-18-GPU执行模型与kernel工程.md)
+- [第 19 章 可靠性、运维与容量规划](deepinfer教程-19-可靠性、运维与容量规划.md)
 
 ### 第四部分：动手实现 mini-deepinfer
 
-- [第 20 章 mini-deepinfer 的设计与边界](20-mini-design.md)
-- [第 21 章 玩具模型、Tokenizer 与反向传播](21-mini-model-kernels.md)
-- [第 22 章 分页 KV 与调度器实现](22-mini-paged-kv-scheduler.md)
-- [第 23 章 推测解码与结构化输出实现](23-mini-speculative-structured.md)
-- [第 24 章 EPLB、并行模拟、TP 与 KV 分层](24-mini-eplb-parallel-kv.md)
-- [第 25 章 HTTP 服务与可观测性](25-mini-http-observability.md)
-- [第 26 章 测试、验证与性能实验](26-testing-validation.md)
-- [第 27 章 从玩具到生产](27-from-toy-to-production.md)
+- [第 20 章 mini-deepinfer 的设计与边界](deepinfer教程-20-mini-deepinfer的设计与边界.md)
+- [第 21 章 玩具模型、Tokenizer 与反向传播](deepinfer教程-21-玩具模型、Tokenizer与反向传播.md)
+- [第 22 章 分页 KV 与调度器实现](deepinfer教程-22-分页KV与调度器实现.md)
+- [第 23 章 推测解码与结构化输出实现](deepinfer教程-23-推测解码与结构化输出实现.md)
+- [第 24 章 EPLB、并行模拟、TP 与 KV 分层](deepinfer教程-24-EPLB、并行模拟与KV分层.md)
+- [第 25 章 HTTP 服务与可观测性](deepinfer教程-25-HTTP服务与可观测性.md)
+- [第 26 章 测试、验证与性能实验](deepinfer教程-26-测试、验证与性能实验.md)
+- [第 27 章 从玩具到生产](deepinfer教程-27-从玩具到生产.md)
 
 ### 第五部分：安全与评测
 
-- [第 28 章 安全、隐私与多租户](28-security-privacy.md)
-- [第 29 章 评测体系与质量保证](29-evaluation-quality.md)
+- [第 28 章 安全、隐私与多租户](deepinfer教程-28-安全、隐私与多租户.md)
+- [第 29 章 评测体系与质量保证](deepinfer教程-29-评测体系与质量保证.md)
 
 ### 第六部分：商业与部署
 
-- [第 30 章 推理经济学](30-inference-economics.md)
-- [第 31 章 竞争格局与开源战略](31-competitive-landscape.md)
-- [第 32 章 部署选型与 TCO](32-deployment-tco.md)
+- [第 30 章 推理经济学](deepinfer教程-30-推理经济学.md)
+- [第 31 章 竞争格局与开源战略](deepinfer教程-31-竞争格局与开源战略.md)
+- [第 32 章 部署选型与 TCO](deepinfer教程-32-部署选型与TCO.md)
 
 ### 第七部分：工程化与产品化
 
-- [第 33 章 工程化：从可运行到可维护](33-engineering-production.md)
-- [第 34 章 模型接入、权重管理与版本治理](34-model-onboarding-versioning.md)
-- [第 35 章 云原生部署与 Kubernetes](35-cloud-native-kubernetes.md)
-- [第 36 章 推理产品化与商业路径](36-productization-business.md)
-- [第 37 章 合规、许可与供应链治理](37-compliance-licensing-governance.md)
+- [第 33 章 工程化：从可运行到可维护](deepinfer教程-33-工程化-从可运行到可维护.md)
+- [第 34 章 模型接入、权重管理与版本治理](deepinfer教程-34-模型接入、权重管理与版本治理.md)
+- [第 35 章 云原生部署与 Kubernetes](deepinfer教程-35-云原生部署与Kubernetes.md)
+- [第 36 章 推理产品化与商业路径](deepinfer教程-36-推理产品化与商业路径.md)
+- [第 37 章 合规、许可与供应链治理](deepinfer教程-37-合规、许可与供应链治理.md)
 
 ### 第八部分：专项负载与平台能力
 
-- [第 38 章 多模态推理工程：从像素到 token](38-multimodal-inference.md)
-- [第 39 章 推理模型与长思维链服务](39-reasoning-workloads.md)
-- [第 40 章 离线批处理：吞吐型推理服务](40-offline-batch-serving.md)
-- [第 41 章 多模型、多适配器与模型路由](41-multi-model-adapters.md)
-- [第 42 章 Embedding、Rerank 与检索推理](42-embedding-rerank.md)
-- [第 43 章 推理编译器与图优化](43-compiler-graph.md)
+- [第 38 章 多模态推理工程：从像素到 token](deepinfer教程-38-多模态推理工程-从像素到token.md)
+- [第 39 章 推理模型与长思维链服务](deepinfer教程-39-推理模型与长思维链服务.md)
+- [第 40 章 离线批处理：吞吐型推理服务](deepinfer教程-40-离线批处理-吞吐型推理服务.md)
+- [第 41 章 多模型、多适配器与模型路由](deepinfer教程-41-多模型、多适配器与模型路由.md)
+- [第 42 章 Embedding、Rerank 与检索推理](deepinfer教程-42-Embedding、Rerank与检索推理.md)
+- [第 43 章 推理编译器与图优化](deepinfer教程-43-推理编译器与图优化.md)
 
 ### 第九部分：训练侧推理、端侧与流量
 
-- [第 44 章 强化学习推理与 rollout 引擎](44-rl-rollout.md)
-- [第 45 章 端侧、边缘与异构推理](45-edge-heterogeneous.md)
-- [第 46 章 流量工程、多区域与容量运营](46-traffic-engineering.md)
+- [第 44 章 强化学习推理与 rollout 引擎](deepinfer教程-44-强化学习推理与rollout引擎.md)
+- [第 45 章 端侧、边缘与异构推理](deepinfer教程-45-端侧、边缘与异构推理.md)
+- [第 46 章 流量工程、多区域与容量运营](deepinfer教程-46-流量工程、多区域与容量运营.md)
 
 ### 第十部分：商业分析与结语
 
-- [第 47 章 商业分析进阶：现金流、定价与投资回报](47-business-finance.md)
-- [第 48 章 商业分析：市场测算与进入策略](48-market-sizing.md)
-- [第 49 章 商业分析：估值、融资与资本回报](49-valuation-financing.md)
-- [第 50 章 未来方向](50-future-directions.md)
-- [第 51 章 结语与路线图](51-conclusion.md)
+- [第 47 章 商业分析进阶：现金流、定价与投资回报](deepinfer教程-47-商业分析进阶-现金流、定价与投资回报.md)
+- [第 48 章 商业分析：市场测算与进入策略](deepinfer教程-48-商业分析-市场测算与进入策略.md)
+- [第 49 章 商业分析：估值、融资与资本回报](deepinfer教程-49-商业分析-估值、融资与资本回报.md)
+- [第 50 章 未来方向](deepinfer教程-50-未来方向.md)
+- [第 51 章 结语与路线图](deepinfer教程-51-结语与路线图.md)
 
 ### 附录
 
-- [附录 A 术语表](appendix-a-glossary.md)
-- [附录 B 公式与常数](appendix-b-formulas.md)
-- [附录 C API 与配置参考](appendix-c-api-config.md)
-- [附录 D 参考资料](appendix-d-references.md)
-- [附录 E 实验手册与命令速查](appendix-e-lab-manual.md)
-- [附录 F Transformer 推理基础](appendix-f-transformer-basics.md)
-- [附录 G 一个请求的完整生命周期](appendix-g-request-lifecycle.md)
-- [附录 H 练习提示与参考答案](appendix-h-exercise-answers.md)
-- [附录 I 模块、API 与测试矩阵](appendix-i-module-api-index.md)
-- [附录 J 生产故障排查手册](appendix-j-troubleshooting.md)
+- [附录 A 术语表](deepinfer教程-52-附录A-术语表.md)
+- [附录 B 公式与常数](deepinfer教程-53-附录B-公式与常数.md)
+- [附录 C API 与配置参考](deepinfer教程-54-附录C-API与配置参考.md)
+- [附录 D 参考资料](deepinfer教程-55-附录D-参考资料.md)
+- [附录 E 实验手册与命令速查](deepinfer教程-56-附录E-实验手册与命令速查.md)
+- [附录 F Transformer 推理基础](deepinfer教程-57-附录F-Transformer推理基础.md)
+- [附录 G 一个请求的完整生命周期](deepinfer教程-58-附录G-一个请求的完整生命周期.md)
+- [附录 H 练习提示与参考答案](deepinfer教程-59-附录H-练习提示与参考答案.md)
+- [附录 I 模块、API 与测试矩阵](deepinfer教程-60-附录I-mini-deepinfer模块、API与测试矩阵.md)
+- [附录 J 生产故障排查手册](deepinfer教程-61-附录J-生产故障排查手册.md)
 
 ## 玩具模型说明
 

@@ -136,12 +136,12 @@ def check_inventory(docs: list[Doc], rep: Report) -> None:
         rep.fail("inventory", f"章号不连续：{nums}")
     # 文件名前缀必须和章号一致
     for n, d in chapters.items():
-        if not d.rel.startswith(f"{int(n):02d}-"):
+        if not d.rel.startswith(f"lancedb教程-{int(n):02d}-"):
             rep.fail("inventory", f"{d.rel} 的章号是第 {n} 章，但文件名前缀对不上")
     # 附录字母必须和文件名前缀顺序一致（曾经的错：32 号文件是附录 D）
     for letter, d in appendices.items():
         idx = 30 + (ord(letter) - ord("A"))
-        if not d.rel.startswith(f"{idx}-"):
+        if not d.rel.startswith(f"lancedb教程-{idx}-"):
             rep.fail(
                 "inventory",
                 f"{d.rel} 自报为附录 {letter}，按字母顺序文件名前缀应为 {idx}-（文件序与字母序不一致）",
@@ -168,7 +168,7 @@ def check_readme_toc(docs: list[Doc], rep: Report) -> None:
     if readme is None:
         rep.fail("readme", "找不到 README.md")
         return
-    linked = set(re.findall(r"\]\((\d\d-[a-z0-9-]+\.md)\)", readme.text))
+    linked = set(re.findall(r"\]\((lancedb教程-\d\d-[^)]+\.md)\)", readme.text))
     present = {d.rel for d in docs if d.kind in ("chapter", "appendix")}
     rep.counted("readme-links", len(linked))
     rep.require_nonempty("readme-links", len(linked))
@@ -229,7 +229,7 @@ def check_readme_titles(docs: list[Doc], rep: Report) -> None:
     by_rel = {d.rel: d for d in docs}
     n = 0
     for line in readme.lines:
-        m = re.match(r"^\s*-\s*\[(.+?)\]\((\d\d-[a-z0-9-]+\.md)\)\s*$", line)
+        m = re.match(r"^\s*-\s*\[(.+?)\]\((lancedb教程-\d\d-[^)]+\.md)\)\s*$", line)
         if not m:
             continue
         n += 1
