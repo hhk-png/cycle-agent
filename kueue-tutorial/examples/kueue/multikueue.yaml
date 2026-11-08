@@ -1,0 +1,158 @@
+# MultiKueue 最小骨架（v1beta2）
+#
+# 这里只展示对象关系，kubeconfig 是占位值，不能直接用于真实集群。
+# Secret 必须位于 kueue-controller-manager 所在 namespace（通常是
+# kueue-system），并且 kubeconfig 内容放在 key "kubeconfig" 下。
+#
+# 生产建议每个 worker 使用独立身份，并定期轮换凭据。
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: worker-a-kubeconfig
+  namespace: kueue-system
+type: Opaque
+stringData:
+  kubeconfig: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - name: worker-a
+      cluster:
+        server: https://worker-a.example.com:6443
+        certificate-authority-data: REPLACE_ME
+    users:
+    - name: kueue-manager
+      user:
+        token: REPLACE_ME
+    contexts:
+    - name: worker-a
+      context:
+        cluster: worker-a
+        user: kueue-manager
+    current-context: worker-a
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: worker-b-kubeconfig
+  namespace: kueue-system
+type: Opaque
+stringData:
+  kubeconfig: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - name: worker-b
+      cluster:
+        server: https://worker-b.example.com:6443
+        certificate-authority-data: REPLACE_ME
+    users:
+    - name: kueue-manager
+      user:
+        token: REPLACE_ME
+    contexts:
+    - name: worker-b
+      context:
+        cluster: worker-b
+        user: kueue-manager
+    current-context: worker-b
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueCluster
+metadata:
+  name: worker-a
+spec:
+  clusterSource:
+    kubeConfig:
+      locationType: Secret
+      location: worker-a-kubeconfig
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueCluster
+metadata:
+  name: worker-b
+spec:
+  clusterSource:
+    kubeConfig:
+      locationType: Secret
+      location: worker-b-kubeconfig
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: MultiKueueConfig
+metadata:
+  name: platform-workers
+spec:
+  # 顺序影响 AllAtOnce 的副本创建顺序；Incremental 在
+  # MultiKueueIncrementalDispatcherRespectConfigOrder 开启时也按此顺序。
+  clusters:
+  - worker-a
+  - worker-b
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: multikueue
+spec:
+  controllerName: kueue.x-k8s.io/multikueue
+  parameters:
+    apiGroup: kueue.x-k8s.io
+    kind: MultiKueueConfig
+    name: platform-workers
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: multi-team-a
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  admissionChecksStrategy:
+    admissionChecks:
+    - name: multikueue
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 16
+      - name: memory
+        nominalQuota: 64Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: team-a-queue
+spec:
+  clusterQueue: multi-team-a
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multi-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: team-a-queue
+spec:
+  suspend: true
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: main
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 60"]
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+      restartPolicy: Never

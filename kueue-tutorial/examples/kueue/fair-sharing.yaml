@@ -1,0 +1,220 @@
+# Hierarchical cohorts with weighted fair sharing.
+# This is an illustrative configuration: adjust quotas, weights and images
+# for your cluster. Fair sharing arbitrates borrowable capacity; it does not
+# replace nominal quota.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: org-a-team1
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: org-a-team2
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: org-b-team
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: a100
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: a100
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: root
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: org-a
+spec:
+  parentName: root
+  fairSharing:
+    weight: "3"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: org-b
+spec:
+  parentName: root
+  fairSharing:
+    weight: "1"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-a1-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: org-a-team1
+  cohortName: org-a
+  queueingStrategy: BestEffortFIFO
+  fairSharing:
+    weight: "1"
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 32
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 4
+        borrowingLimit: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-a2-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: org-a-team2
+  cohortName: org-a
+  queueingStrategy: BestEffortFIFO
+  fairSharing:
+    weight: "1"
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 32
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 4
+        borrowingLimit: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-b-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: org-b-team
+  cohortName: org-b
+  queueingStrategy: BestEffortFIFO
+  fairSharing:
+    weight: "1"
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 32
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 4
+        borrowingLimit: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: org-a-team1
+  name: org-a-team1-queue
+spec:
+  clusterQueue: team-a1-cq
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: org-a-team2
+  name: org-a-team2-queue
+spec:
+  clusterQueue: team-a2-cq
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: org-b-team
+  name: org-b-team-queue
+spec:
+  clusterQueue: team-b-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: org-a-team1-batch
+  namespace: org-a-team1
+  labels:
+    kueue.x-k8s.io/queue-name: org-a-team1-queue
+spec:
+  parallelism: 4
+  completions: 4
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: org-a-team2-batch
+  namespace: org-a-team2
+  labels:
+    kueue.x-k8s.io/queue-name: org-a-team2-queue
+spec:
+  parallelism: 4
+  completions: 4
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: org-b-batch
+  namespace: org-b-team
+  labels:
+    kueue.x-k8s.io/queue-name: org-b-team-queue
+spec:
+  parallelism: 4
+  completions: 4
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never

@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: a100
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: a100
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: shared-gpu
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-a-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: team-a
+  cohortName: shared-gpu
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 8
+      - name: memory
+        nominalQuota: 64Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 4
+        borrowingLimit: 8
+        lendingLimit: 2
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-b-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: team-b
+  cohortName: shared-gpu
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 4
+      - name: memory
+        nominalQuota: 32Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 2
+        borrowingLimit: 4
+        lendingLimit: 2
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-a
+  name: team-a-queue
+spec:
+  clusterQueue: team-a-cq
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-b
+  name: team-b-queue
+spec:
+  clusterQueue: team-b-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: team-a-train
+  namespace: team-a
+  labels:
+    kueue.x-k8s.io/queue-name: team-a-queue
+spec:
+  parallelism: 4
+  completions: 4
+  template:
+    spec:
+      containers:
+      - name: train
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: team-b-train
+  namespace: team-b
+  labels:
+    kueue.x-k8s.io/queue-name: team-b-queue
+spec:
+  parallelism: 2
+  completions: 2
+  template:
+    spec:
+      containers:
+      - name: train
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never

@@ -1,0 +1,89 @@
+# 一个可被 scripts/check_kueue_config.py 静态检查的 Kueue Configuration。
+#
+# 这是 controller_manager_config.yaml 的内容，不是可以直接 kubectl apply 的
+# 独立 CR；实际使用时它位于 kueue-system/kueue-manager-config ConfigMap 中。
+# 字段含义见第 3.6 节和第 23 章。
+apiVersion: config.kueue.x-k8s.io/v1beta2
+kind: Configuration
+namespace: kueue-system
+
+# v1beta2 的 featureGates 是顶层 map[string]bool。
+# 不要和 Deployment 的 --feature-gates 参数同时使用。
+featureGates:
+  TopologyAwareScheduling: true
+  TASMultiLayerTopology: true
+  MultiKueue: true
+  AdmissionFairSharing: true
+  LocalQueueDefaulting: true
+  WorkloadPriorityClassDefaulting: true
+
+# 只 reconcile 带此标签的 namespace；v0.19+ 总是生效。
+managedJobsNamespaceSelector:
+  matchLabels:
+    managed-by-kueue: "true"
+
+manageJobsWithoutQueueName: false
+
+integrations:
+  frameworks:
+  - "batch/job"
+  - "jobset.x-k8s.io/jobset"
+  - "ray.io/rayjob"
+  - "kubeflow.org/pytorchjob"
+  labelKeysToCopy:
+  - "team.example.com/cost-center"
+
+queueVisibility:
+  updateIntervalSeconds: 30
+  clusterQueues:
+    maxCount: 10
+
+waitForPodsReady:
+  timeout: 30m
+  recoveryTimeout: 5m
+  blockAdmission: false
+
+fairSharing:
+  preemptionStrategies:
+  - LessThanOrEqualToFinalShare
+  - LessThanInitialShare
+
+admissionFairSharing:
+  usageHalfLifeTime: 168h
+  usageSamplingInterval: 5m
+  resourceWeights:
+    nvidia.com/gpu: 10
+
+resources:
+  transformations:
+  - input: example.com/gpu
+    strategy: Retain
+    multiplyBy: example.com/gpumem
+    outputs:
+      total-gpumem: 1
+
+leaderElection:
+  leaderElect: true
+  resourceName: c1f6bfd2.kueue.x-k8s.io
+
+metrics:
+  bindAddress: ":8443"
+
+webhook:
+  port: 9443
+
+health:
+  healthProbeBindAddress: ":8081"
+
+controller:
+  groupKindConcurrency:
+    Workload: 5
+    LocalQueue: 1
+    ClusterQueue: 1
+
+clientConnection:
+  qps: 50
+  burst: 500
+
+internalCertManagement:
+  enable: true

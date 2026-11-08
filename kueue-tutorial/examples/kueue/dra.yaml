@@ -1,0 +1,93 @@
+# DRA end-to-end object sketch.
+#
+# Prerequisites:
+# - Kubernetes 1.34+ with Dynamic Resource Allocation enabled;
+# - a DRA driver that registers the gpu.example.com DeviceClass;
+# - Kueue's KueueDRAIntegration gate;
+# - the deviceClassMappings fragment in examples/config/dra-device-mapping.yaml
+#   merged into kueue-manager-config (and the controller restarted).
+#
+# The quota ledger counts the logical resource nvidia.com/gpu; the DeviceClass
+# name never appears in nominalQuota.
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: gpu.example.com
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == "gpu.example.com"
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: gpu-claim
+  namespace: default
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.example.com
+          count: 1
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: dra-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: dra-cq
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: dra-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 8
+      - name: memory
+        nominalQuota: 16Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: dra-queue
+spec:
+  clusterQueue: dra-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dra-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: dra-queue
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: gpu-claim
+      containers:
+      - name: main
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 60"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 1Gi
+        # The device is provided through the ResourceClaim, not as an
+        # extended resource request.
+      restartPolicy: Never

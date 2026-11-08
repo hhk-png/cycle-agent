@@ -1,0 +1,68 @@
+# Resource transformations for quota accounting.
+#
+# The Pod below requests a vGPU-shaped set of resources. Kueue's quota ledger
+# sees total memory and total cores instead, and ignores the vGPU count itself.
+# This mirrors the HAMi example in the upstream documentation.
+#
+# IMPORTANT: the `resources.transformations` block is part of the Kueue
+# controller Configuration, not a standalone CR. It lives in
+# examples/config/resource-transformations.yaml. Merge that block into
+# kueue-system/kueue-manager-config and restart the controller BEFORE applying
+# the ResourceFlavor/ClusterQueue/Job documents in this file.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: vgpu
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: vgpu-pool
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources:
+        - example.com/total-gpumem
+        - example.com/total-gpucores
+        - pods
+      flavors:
+        - name: vgpu
+          resources:
+            - name: example.com/total-gpumem
+              nominalQuota: 4096
+            - name: example.com/total-gpucores
+              nominalQuota: 80
+            - name: pods
+              nominalQuota: 4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: vgpu-queue
+  namespace: default
+spec:
+  clusterQueue: vgpu-pool
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vgpu-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: vgpu-queue
+spec:
+  parallelism: 1
+  completions: 1
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              example.com/gpu: 2
+              example.com/gpumem: 1024
+              example.com/gpucores: 20

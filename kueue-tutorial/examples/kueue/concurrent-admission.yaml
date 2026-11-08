@@ -1,0 +1,81 @@
+# Concurrent Admission (alpha).
+#
+# The queue has two flavors. The reserved flavor is listed first but has no
+# quota initially, so the workload starts on spot. Once reserved capacity is
+# available, Kueue can migrate the workload to the preferred flavor.
+#
+# Requirements: BestEffortFIFO, one resource group, at most 32 flavors, no
+# heterogeneous PodSets, and the ConcurrentAdmission feature gate.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-reserved
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: a100-reserved
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-spot
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: a100-spot
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: concurrent-cq
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  concurrentAdmissionPolicy:
+    migration:
+      mode: TryPreferredFlavors
+      constraints:
+        lastAcceptableFlavorName: gpu-spot
+  resourceGroups:
+  - coveredResources: ["cpu", "nvidia.com/gpu"]
+    flavors:
+    - name: gpu-reserved
+      resources:
+      - name: cpu
+        nominalQuota: 0
+      - name: nvidia.com/gpu
+        nominalQuota: 0
+    - name: gpu-spot
+      resources:
+      - name: cpu
+        nominalQuota: 64
+      - name: nvidia.com/gpu
+        nominalQuota: 16
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: concurrent-queue
+spec:
+  clusterQueue: concurrent-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: concurrent-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: concurrent-queue
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: c
+        image: busybox
+        command: ["sleep", "600"]
+        resources:
+          requests:
+            cpu: "8"
+            nvidia.com/gpu: "1"
+      restartPolicy: Never

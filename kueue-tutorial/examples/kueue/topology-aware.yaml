@@ -1,0 +1,72 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Topology
+metadata:
+  name: gpu-topology
+spec:
+  levels:
+  - nodeLabel: topology.kubernetes.io/zone
+  - nodeLabel: cloud.provider.com/topology-block
+  - nodeLabel: cloud.provider.com/topology-rack
+  - nodeLabel: kubernetes.io/hostname
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: tas-gpu
+spec:
+  nodeLabels:
+    cloud.provider.com/node-group: tas-gpu
+  topologyName: gpu-topology
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: tas-cq
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: tas-gpu
+      resources:
+      - name: cpu
+        nominalQuota: 64
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 16
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: tas-queue
+spec:
+  clusterQueue: tas-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tas-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: tas-queue
+spec:
+  parallelism: 8
+  completions: 8
+  template:
+    metadata:
+      annotations:
+        kueue.x-k8s.io/podset-required-topology: cloud.provider.com/topology-rack
+    spec:
+      containers:
+      - name: train
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "8"
+            memory: 32Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never

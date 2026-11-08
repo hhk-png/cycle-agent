@@ -1,0 +1,82 @@
+# 自定义 AdmissionCheck 控制器的最小对象骨架。
+#
+# 注意：LicenseCheckConfig 是示例 CRD，真实集群里必须先安装这个 CRD
+# 和对应的控制器。本文件用于说明对象关系，不能单独 apply 后期待生效。
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: license-check
+spec:
+  controllerName: example.com/license-check
+  parameters:
+    apiGroup: example.com
+    kind: LicenseCheckConfig
+    name: default
+---
+apiVersion: example.com/v1
+kind: LicenseCheckConfig
+metadata:
+  name: default
+spec:
+  required: true
+  ttlSeconds: 3600
+  # failOpen=true 表示外部系统故障时放行；生产上要谨慎并审计。
+  failOpen: false
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: licensed-team
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  admissionChecksStrategy:
+    admissionChecks:
+    - name: license-check
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 8
+      - name: memory
+        nominalQuota: 32Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: licensed-queue
+spec:
+  clusterQueue: licensed-team
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: licensed-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: licensed-queue
+spec:
+  suspend: true
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: main
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 60"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 1Gi
+      restartPolicy: Never

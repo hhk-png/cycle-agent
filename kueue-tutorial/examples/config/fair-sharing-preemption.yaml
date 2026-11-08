@@ -1,0 +1,12 @@
+# Fragment for kueue-system/kueue-manager-config's
+# controller_manager_config.yaml. Merge the `fairSharing` block into the
+# existing Configuration; do NOT kubectl apply this as a second CR.
+#
+# See docs/03-install-and-quickstart.md 3.6.1 for the safe edit/restart flow.
+apiVersion: config.kueue.x-k8s.io/v1beta2
+kind: Configuration
+namespace: kueue-system
+fairSharing:
+  preemptionStrategies:
+  - LessThanOrEqualToFinalShare
+  - LessThanInitialShare

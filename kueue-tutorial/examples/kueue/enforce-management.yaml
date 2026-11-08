@@ -1,0 +1,143 @@
+# 纳管边界示例：默认 LocalQueue + 默认 WorkloadPriorityClass +
+# managedJobsNamespaceSelector + ValidatingAdmissionPolicy。
+#
+# 前提：
+# - Kubernetes 1.30+（ValidatingAdmissionPolicy v1）；
+# - Kueue 已安装，且 LocalQueueDefaulting / WorkloadPriorityClassDefaulting
+#   在目标版本中可用（前者 v0.17 stable，后者 v0.20 beta）；
+# - 如果启用了 managedJobsNamespaceSelector，namespace 必须带匹配标签。
+#
+# 注意：VAP 会真实拒绝未打 queue-name 标签的 Job。先在测试集群验证；
+# 如果只想观察，把 validationActions 改成 ["Warn"] 或 ["Audit"]。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-managed
+  labels:
+    managed-by-kueue: "true"
+    kueue-managed: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: management-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: management-cq
+spec:
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: team-managed
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: management-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 4
+      - name: memory
+        nominalQuota: 8Gi
+---
+# 名字必须叫 default：Kueue 的 mutating webhook 会给同 namespace 内
+# 没有 queue-name 标签的新 Job 补上 kueue.x-k8s.io/queue-name: default。
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-managed
+  name: default
+spec:
+  clusterQueue: management-cq
+---
+# 名字必须叫 default：没有 priority-class 标签的被管理作业会继承它。
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: WorkloadPriorityClass
+metadata:
+  name: default
+value: 100
+description: "Default queueing priority for managed jobs"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: require-kueue-queue
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["batch"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["jobs"]
+    - apiGroups: ["jobset.x-k8s.io"]
+      apiVersions: ["v1alpha2"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["jobsets"]
+  matchConditions:
+  # JobSet 创建的子 Job 没有 queue-name 标签是正常的；不要拒绝它们。
+  - name: exclude-jobset-owned
+    expression: "!(has(object.metadata.ownerReferences) && object.metadata.ownerReferences.exists(o, o.apiVersion=='jobset.x-k8s.io/v1alpha2' && o.kind=='JobSet' && o.controller))"
+  validations:
+  - expression: "has(object.metadata.labels) && 'kueue.x-k8s.io/queue-name' in object.metadata.labels && object.metadata.labels['kueue.x-k8s.io/queue-name'] != ''"
+    message: "必须设置 kueue.x-k8s.io/queue-name 标签"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: require-kueue-queue
+spec:
+  policyName: require-kueue-queue
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kueue-managed: "true"
+---
+# 故意不写 queue-name：如果默认 LocalQueue 生效，mutating webhook 会补标签，
+# 然后 VAP 校验通过；如果没有默认 LocalQueue，这个 Job 会被 VAP 拒绝。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: defaulted-job
+  namespace: team-managed
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: main
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 60"]
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 128Mi
+      restartPolicy: Never
+---
+# 显式队列：不依赖默认值，也不受默认 LocalQueue 影响。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: explicit-queue-job
+  namespace: team-managed
+  labels:
+    kueue.x-k8s.io/queue-name: default
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: main
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 60"]
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 128Mi
+      restartPolicy: Never

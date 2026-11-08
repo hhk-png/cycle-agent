@@ -1,0 +1,114 @@
+# Configurable preemption (alpha, v0.20+).
+#
+# Classic preemption is disabled on the ClusterQueue. The PreemptionConfig
+# authorizes exactly one asymmetric rule: an incoming hero workload may evict
+# batch workloads in its cohort tree when their priority is strictly lower.
+#
+# Enable the ConfigurablePreemptions feature gate before applying.
+apiVersion: kueue.x-k8s.io/v1alpha1
+kind: PreemptionConfig
+metadata:
+  name: hero-protection
+spec:
+  rules:
+    - name: evict-lower-priority-batch
+      activationPolicy:
+        trigger: InsufficientQuota
+      candidateSelectors:
+        - scope: WithinCohortTree
+          priority:
+            mode: Base
+            comparison: LessThan
+          labelSelector:
+            matchLabels:
+              workload-type: batch
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: shared-gpu
+  annotations:
+    kueue.x-k8s.io/preemption-config-name: hero-protection
+spec:
+  namespaceSelector: {}
+  cohortName: shared
+  # Deliberately no spec.preemption: only the config rule may preempt.
+  resourceGroups:
+    - coveredResources: ["cpu", "nvidia.com/gpu", "pods"]
+      flavors:
+        - name: default
+          resources:
+            - name: cpu
+              nominalQuota: 256
+            - name: nvidia.com/gpu
+              nominalQuota: 32
+            - name: pods
+              nominalQuota: 64
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: batch
+  namespace: default
+spec:
+  clusterQueue: shared-gpu
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: hero
+  namespace: default
+spec:
+  clusterQueue: shared-gpu
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: batch
+    workload-type: batch
+spec:
+  parallelism: 4
+  completions: 4
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: "8"
+              nvidia.com/gpu: 8
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hero-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: hero
+    workload-type: hero
+spec:
+  parallelism: 1
+  completions: 1
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: "32"
+              nvidia.com/gpu: 8

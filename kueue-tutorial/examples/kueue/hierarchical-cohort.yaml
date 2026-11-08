@@ -1,0 +1,115 @@
+# Hierarchical cohorts with a subtree-wide borrowing limit.
+#
+# root
+# ├── org-research   borrowingLimit: 8 GPU
+# └── org-product    lendingLimit:   4 GPU
+#
+# Apply root first, then the children, then the queues.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: root
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: org-research
+spec:
+  parentName: root
+  fairSharing:
+    weight: "2"
+  resourceGroups:
+  - coveredResources: ["nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: nvidia.com/gpu
+        nominalQuota: 0
+        borrowingLimit: 8
+        lendingLimit: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: org-product
+spec:
+  parentName: root
+  fairSharing:
+    weight: "1"
+  resourceGroups:
+  - coveredResources: ["nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: nvidia.com/gpu
+        nominalQuota: 0
+        borrowingLimit: 4
+        lendingLimit: 4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: a100
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: a100
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-research
+spec:
+  cohortName: org-research
+  namespaceSelector:
+    matchLabels:
+      team: research
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 128
+      - name: memory
+        nominalQuota: 1Ti
+      - name: nvidia.com/gpu
+        nominalQuota: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-product
+spec:
+  cohortName: org-product
+  namespaceSelector:
+    matchLabels:
+      team: product
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: a100
+      resources:
+      - name: cpu
+        nominalQuota: 64
+      - name: memory
+        nominalQuota: 512Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 8
+  preemption:
+    reclaimWithinCohort: LowerPriority
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-research
+  name: queue
+spec:
+  clusterQueue: cq-research
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-product
+  name: queue
+spec:
+  clusterQueue: cq-product

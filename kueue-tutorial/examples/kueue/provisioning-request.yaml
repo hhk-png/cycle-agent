@@ -1,0 +1,77 @@
+# ProvisioningRequest integration.
+#
+# The AdmissionCheck is owned by the built-in provisioning-request controller.
+# While the check is Pending the Workload keeps its quota reservation; Retry
+# releases quota, backs off, and re-queues. Once capacity is provisioned the
+# check becomes Ready and the Job is admitted.
+#
+# This example assumes the ProvisioningRequest feature is enabled in the
+# Kueue Configuration (see chapter 9 and chapter 24 for feature gates).
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: provisioning-request
+spec:
+  controllerName: kueue.x-k8s.io/provisioning-request
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: on-demand-gpu
+spec:
+  nodeLabels:
+    cloud.google.com/gke-provisioning: standard
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: autoscaled-gpu
+spec:
+  namespaceSelector: {}
+  admissionChecksStrategy:
+    admissionChecks:
+    - name: provisioning-request
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "pods"]
+      flavors:
+        - name: on-demand-gpu
+          resources:
+            - name: cpu
+              nominalQuota: 128
+            - name: memory
+              nominalQuota: 512Gi
+            - name: nvidia.com/gpu
+              nominalQuota: 32
+            - name: pods
+              nominalQuota: 128
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: autoscaled
+  namespace: default
+spec:
+  clusterQueue: autoscaled-gpu
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: provisioning-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: autoscaled
+spec:
+  parallelism: 1
+  completions: 1
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: worker
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+              nvidia.com/gpu: 8

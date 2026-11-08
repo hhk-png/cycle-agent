@@ -1,0 +1,78 @@
+# Fair-sharing preemption.
+#
+# When a cohort is full, a queue whose usage is inside its nominal quota can
+# reclaim borrowed capacity from a heavier peer. The two strategies are
+# evaluated in order; the default is LessThanOrEqualToFinalShare.
+#
+# IMPORTANT: `fairSharing.preemptionStrategies` is part of the Kueue
+# controller Configuration, not a standalone CR. It lives in
+# examples/config/fair-sharing-preemption.yaml. Merge it into
+# kueue-system/kueue-manager-config and restart the controller BEFORE applying
+# the objects in this file.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: Cohort
+metadata:
+  name: shared
+spec:
+  fairSharing:
+    weight: 1
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-a
+spec:
+  namespaceSelector: {}
+  cohortName: shared
+  fairSharing:
+    weight: 1
+  resourceGroups:
+    - coveredResources: ["cpu", "pods"]
+      flavors:
+        - name: default
+          resources:
+            - name: cpu
+              nominalQuota: 4000
+            - name: pods
+              nominalQuota: 64
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: team-b
+spec:
+  namespaceSelector: {}
+  cohortName: shared
+  fairSharing:
+    weight: 1
+  resourceGroups:
+    - coveredResources: ["cpu", "pods"]
+      flavors:
+        - name: default
+          resources:
+            - name: cpu
+              nominalQuota: 4000
+            - name: pods
+              nominalQuota: 64
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: q
+  namespace: team-a
+spec:
+  clusterQueue: team-a
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: q
+  namespace: team-b
+spec:
+  clusterQueue: team-b

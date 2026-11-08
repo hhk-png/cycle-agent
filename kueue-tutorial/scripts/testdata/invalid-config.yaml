@@ -1,0 +1,16 @@
+# Intentionally invalid: used by verify_all.sh to prove the config linter
+# actually rejects dependency inversions and reserved resource names.
+apiVersion: config.kueue.x-k8s.io/v1beta2
+kind: Configuration
+featureGates:
+  AdmissionFairSharingAnchorAtQuotaReservation: true
+  AdmissionFairSharing: false
+  TopologyAwareScheduling: false
+  TASTopologySpreading: true
+resources:
+  transformations:
+  - input: pods
+    strategy: Replace
+managedJobsNamespaceSelector: {}
+waitForPodsReady:
+  timeout: 0s

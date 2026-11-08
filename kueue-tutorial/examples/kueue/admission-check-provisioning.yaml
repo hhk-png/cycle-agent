@@ -1,0 +1,85 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ProvisioningRequestConfig
+metadata:
+  name: prov-test-config
+spec:
+  provisioningClassName: check-capacity.autoscaling.x-k8s.io
+  managedResources:
+  - nvidia.com/gpu
+  retryStrategy:
+    backoffLimitCount: 2
+    backoffBaseSeconds: 60
+    backoffMaxSeconds: 1800
+  podSetMergePolicy: IdenticalWorkloadSchedulingRequirements
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: AdmissionCheck
+metadata:
+  name: prov-test
+spec:
+  controllerName: kueue.x-k8s.io/provisioning-request
+  parameters:
+    apiGroup: kueue.x-k8s.io
+    kind: ProvisioningRequestConfig
+    name: prov-test-config
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-flavor
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: gpu-node
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: gpu-cq
+spec:
+  namespaceSelector: {}
+  admissionChecksStrategy:
+    admissionChecks:
+    - name: prov-test
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: gpu-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 64
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 16
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: gpu-queue
+spec:
+  clusterQueue: gpu-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: gpu-queue
+spec:
+  parallelism: 4
+  completions: 4
+  template:
+    spec:
+      containers:
+      - name: train
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "8"
+            memory: 32Gi
+            nvidia.com/gpu: "1"
+      restartPolicy: Never

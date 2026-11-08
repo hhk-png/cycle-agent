@@ -1,0 +1,96 @@
+# WorkloadPriorityClass affects Kueue queueing/preemption only. It does not
+# change the Pod priority used by kube-scheduler. The Job integration reads the
+# kueue.x-k8s.io/priority-class label and copies the value into the Workload.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: WorkloadPriorityClass
+metadata:
+  name: critical-batch
+value: 1000
+description: "Critical batch jobs that should win queue competition."
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: WorkloadPriorityClass
+metadata:
+  name: best-effort-batch
+value: 0
+description: "Batch jobs that may wait and may be preempted."
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: priority-cq
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  preemption:
+    withinClusterQueue: LowerPriority
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 8
+      - name: memory
+        nominalQuota: 32Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: priority-queue
+spec:
+  clusterQueue: priority-cq
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: best-effort-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: priority-queue
+    kueue.x-k8s.io/priority-class: best-effort-batch
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "8"
+            memory: 16Gi
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: critical-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: priority-queue
+    kueue.x-k8s.io/priority-class: critical-batch
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+      restartPolicy: Never

@@ -1,0 +1,54 @@
+# A minimal JobSet with two replicatedJobs: one driver, four workers.
+# Kueue maps each replicatedJob to a PodSet (driver count=1, worker count=4)
+# and admits the whole Workload as one unit.
+#
+# Requires the JobSet controller and the jobset.x-k8s.io/jobset integration
+# enabled in the Kueue Configuration.
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: jobset-train
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: user-queue
+spec:
+  replicatedJobs:
+  - name: driver
+    replicas: 1
+    template:
+      spec:
+        parallelism: 1
+        completions: 1
+        backoffLimit: 0
+        template:
+          spec:
+            containers:
+            - name: driver
+              image: registry.k8s.io/e2e-test-images/agnhost:2.53
+              command: ["/bin/sh"]
+              args: ["-c", "sleep 60"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 2Gi
+            restartPolicy: Never
+  - name: worker
+    replicas: 4
+    template:
+      spec:
+        parallelism: 1
+        completions: 1
+        backoffLimit: 0
+        template:
+          spec:
+            containers:
+            - name: worker
+              image: registry.k8s.io/e2e-test-images/agnhost:2.53
+              command: ["/bin/sh"]
+              args: ["-c", "sleep 60"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 1Gi
+                  nvidia.com/gpu: "1"
+            restartPolicy: Never

@@ -1,0 +1,169 @@
+# 推理、长运行与弹性负载的接入骨架（v1beta2）
+#
+# 这些对象展示的是"如何把负载交给 Kueue 管理"，不包含业务镜像/
+# Service/Ingress。真实集群里请替换镜像、资源请求和拓扑标签。
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-a100
+  labels:
+    gpu-type: a100
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: inference
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: gpu-a100
+      resources:
+      - name: cpu
+        nominalQuota: 64
+      - name: memory
+        nominalQuota: 256Gi
+      - name: nvidia.com/gpu
+        nominalQuota: 8
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: inference-queue
+spec:
+  clusterQueue: inference
+---
+# Deployment：Kueue 通过 Pod 集成逐 Pod 管理，不是单个 Workload。
+# 队列名标签放在 Deployment metadata 上，webhook 会复制到 Pod 模板。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-inference-service
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: inference-queue
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: main-inference-service
+  template:
+    metadata:
+      labels:
+        app: main-inference-service
+        kueue.x-k8s.io/queue-name: inference-queue
+      annotations:
+        # 先声明 required topology，再使用 spreading。
+        kueue.x-k8s.io/podset-required-topology: topology.kubernetes.io/zone
+        kueue.x-k8s.io/podset-topology-spreading: |
+          {
+            "workloadLabelSelectors": [
+              {"key": "app", "operator": "In", "values": ["main-inference-service"]}
+            ],
+            "rules": [
+              {
+                "topologyKey": "topology.kubernetes.io/zone",
+                "maxShareAllowingPlacement": "0.45",
+                "enforcementMode": "Preferred"
+              }
+            ]
+          }
+    spec:
+      containers:
+      - name: server
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+          limits:
+            nvidia.com/gpu: "1"
+---
+# StatefulSet：由集成按 PodGroup/副本组管理；暂停机制通常是 replicas=0。
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: inference-stateful
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: inference-queue
+spec:
+  serviceName: inference-stateful
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference-stateful
+  template:
+    metadata:
+      labels:
+        app: inference-stateful
+        kueue.x-k8s.io/queue-name: inference-queue
+    spec:
+      containers:
+      - name: server
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 3600"]
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+            nvidia.com/gpu: "1"
+          limits:
+            nvidia.com/gpu: "1"
+---
+# 裸 Pod：用 scheduling gate 阻止在准入前被调度。
+apiVersion: v1
+kind: Pod
+metadata:
+  name: single-inference-pod
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: inference-queue
+spec:
+  schedulingGates:
+  - name: kueue.x-k8s.io/admission
+  containers:
+  - name: server
+    image: registry.k8s.io/e2e-test-images/agnhost:2.53
+    command: ["/bin/sh"]
+    args: ["-c", "sleep 3600"]
+    resources:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+---
+# Partial Admission：Job 请求 6 个并行副本，最低接受 2 个。
+# 需要 PartialAdmission feature gate；只允许一个 PodSet 使用 minCount。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: elastic-inference-job
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: inference-queue
+  annotations:
+    kueue.x-k8s.io/job-min-parallelism: "2"
+spec:
+  suspend: true
+  parallelism: 6
+  completions: 6
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        command: ["/bin/sh"]
+        args: ["-c", "sleep 120"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+      restartPolicy: Never

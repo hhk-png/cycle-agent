@@ -1,0 +1,92 @@
+# Usage-based Admission Fair Sharing.
+#
+# The ClusterQueue sorts pending Workloads by the historical usage of their
+# LocalQueue. LocalQueue weights scale that history: a queue with weight 2 must
+# consume twice as much history to be considered equally "heavy".
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: afs-cq
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  admissionScope:
+    admissionMode: UsageBasedAdmissionFairSharing
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 16
+      - name: memory
+        nominalQuota: 32Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-heavy
+  name: queue
+spec:
+  clusterQueue: afs-cq
+  fairSharing:
+    weight: "1"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-light
+  name: queue
+spec:
+  clusterQueue: afs-cq
+  fairSharing:
+    weight: "2"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: heavy-job
+  namespace: team-heavy
+  labels:
+    kueue.x-k8s.io/queue-name: queue
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: c
+        image: busybox
+        command: ["sleep", "600"]
+        resources:
+          requests:
+            cpu: "8"
+            memory: 16Gi
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: light-job
+  namespace: team-light
+  labels:
+    kueue.x-k8s.io/queue-name: queue
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      containers:
+      - name: c
+        image: busybox
+        command: ["sleep", "600"]
+        resources:
+          requests:
+            cpu: "8"
+            memory: 16Gi
+      restartPolicy: Never
