@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 C. 故障排查手册
 
 ## C.0 按症状查

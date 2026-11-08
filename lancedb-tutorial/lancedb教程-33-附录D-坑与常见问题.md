@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 D　坑与常见问题
 
 这份清单里的每一条都写清楚三件事：**现象**（你会看到什么）、

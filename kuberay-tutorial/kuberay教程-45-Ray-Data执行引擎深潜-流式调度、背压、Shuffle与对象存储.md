@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 45 章 Ray Data 执行引擎深潜：流式调度、背压、Shuffle 与对象存储
 
 第 27 章讲了“怎么在 KubeRay 上提交一个 Ray Data 作业”。本章回答更底层的问题：**一条 `read_parquet().map_batches().write_parquet()` 在 Ray 内部到底怎样被拆成 task、怎样限制内存、什么时候会 spill、为什么扩容了反而更慢**。

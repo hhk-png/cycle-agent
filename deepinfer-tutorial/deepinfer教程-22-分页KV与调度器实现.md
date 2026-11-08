@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 22 章 分页 KV 与调度器实现
 
 本章导读：本章逐层拆开 mini-deepinfer 的 `BlockManager`、`PagedKVCache` 和 `Scheduler`，解释分页、前缀哈希、COW、chunked prefill、LCFS、抢占和状态回收。重点讲三个实现陷阱：共享块被误判为不可用、抢占时重新 pin 前缀导致显存不释放、chunked prefill 占着块导致队头饿死。

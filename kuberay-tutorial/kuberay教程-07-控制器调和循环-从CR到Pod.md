@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 7 章 控制器调和循环：从 CR 到 Pod
 
 本章沿着一次 `kubectl apply -f ray-cluster.yaml` 的路径，逐步看 KubeRay 如何把 CR 变成 Pod、Service 和 status。理解这条路径后，排查“为什么 Pod 没起来”“为什么 status 不更新”会容易得多。

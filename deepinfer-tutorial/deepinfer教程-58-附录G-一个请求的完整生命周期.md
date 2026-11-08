@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 G 一个请求的完整生命周期
 
 本附录把前面所有机制串成一次可复现的追踪。我们不讨论新的设计，只让一个请求从字符串开始，经过 tokenizer、调度器、分页 KV、模型前向、采样和状态回收，最后变成一个 `RequestOutput`；然后再发一个完全相同的请求，观察前缀缓存如何改变工作量和 block 分配。配套脚本是 `examples/lifecycle.py`，输出只包含确定性字段，因此可以逐行对照。

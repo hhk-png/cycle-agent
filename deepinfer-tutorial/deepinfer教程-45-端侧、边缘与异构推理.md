@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 45 章 端侧、边缘与异构推理
 
 本章导读：数据中心推理假设很多请求、很多 GPU、很宽的互联和很大的显存池；端侧推理假设的几乎相反：batch 通常是 1，内存和功耗有限，网络时有时无，用户对首字延迟和隐私更敏感。本章把端侧当成一套独立的系统来讲：硬件和内存层次、量化与模型体积、roofline 与 tok/s、运行时与批处理、能耗与热、云边混合路由和评测。最后用 `mini_deepinfer/edge.py` 把这些量算成可复现的数字。

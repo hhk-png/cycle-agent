@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 29 章 生态集成：队列、调度与工作流
 
 KubeRay 负责 Ray 集群的生命周期，但“谁可以先跑”“一组 Pod 能不能一起调度”“训练完怎么触发下游”通常由别的系统回答。本章把常见的四类集成讲清楚：批调度器（gang scheduling/队列）、作业队列（Kueue）、工作流编排（Argo/Airflow/Kubeflow/Flyte）、GitOps 与可观测性。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 16 章 长上下文与 Agent 负载工程
 
 本章导读：1M 上下文是模型能力，不是服务默认值。长上下文把 attention 的二次项、KV 的线性增长、prefill 的首 token 延迟和缓存的存储带宽同时放大；Agent 又把这些成本乘以多轮工具调用。本章把“能放进去”和“能服务好”分开，讲清长上下文的成本结构、前缀缓存、上下文并行、长度分桶、Agent 状态机和容量规划。读完本章，你应该能为一个 77K 平均输入、1M 尾部的服务算出 KV、TTFT、缓存收益和 GPU 配比，并知道哪些优化是真收益、哪些只是把成本挪到了别处。

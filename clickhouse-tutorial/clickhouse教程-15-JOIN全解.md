@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 15 章 JOIN 全解
 
 JOIN 是 ClickHouse 里最容易写错、也最容易把机器搞挂的一类查询。写错的原因往往不是不懂 SQL,而是 ClickHouse 的 JOIN 有两组**互相正交**的选项,很多人只记住了其中一组;搞挂机器的原因则几乎总是一句话:**右表放错了边**。这一章先把这两组选项拆干净,再逐个讲清楚每种组合的语义、输出列和典型用途,最后给出那些"不用 JOIN 反而快一个数量级"的替代手段。

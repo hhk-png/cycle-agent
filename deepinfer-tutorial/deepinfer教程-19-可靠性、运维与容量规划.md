@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 19 章 可靠性、运维与容量规划
 
 本章导读：推理服务不是“跑起来就完了”。本章讨论自动扩缩容、故障切换、冗余配额、SLO、可观测性和容量规划，解释 DeepInfer 生产系统如何用 grace period、请求转发和 EP size 重定来吸收故障。最后给出一个可操作的容量规划清单和事故排查顺序。

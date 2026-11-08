@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 B 公式与常数
 
 本附录把全书用到的公式和关键常数集中在一起。标注“官方”的数字来自 DeepInfer README、部署 Q&A 或 DeepSeek 公开技术资料；标注“示意”的数字只用于说明量级，不是承诺。公式可以在 `mini_deepinfer/roofline.py` 里找到可执行的版本。

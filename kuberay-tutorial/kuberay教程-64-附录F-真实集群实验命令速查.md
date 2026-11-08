@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 F. 真实集群实验命令速查
 
 配合[第 26 章](kuberay教程-26-真实集群实验-从kind到第一个RayService.md)使用。所有命令假设 namespace 为 `default`，operator 在 `kuberay-system`。

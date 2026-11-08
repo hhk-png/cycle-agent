@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 6 章 Pod、网络、存储与调度
 
 KubeRay 最终要生成 Pod 和 Service。本章解释这些对象长什么样、为什么这样设计，以及生产环境最容易踩的坑。

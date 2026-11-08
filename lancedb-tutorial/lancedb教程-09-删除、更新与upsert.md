@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 9 章　删除、更新与 upsert
 
 前八章一直在说一件事：**数据文件写完就不再改。** 这一章要面对它的直接后果。

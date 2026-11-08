@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 9 章 自动扩缩容：Ray Autoscaler 与 KubeRay
 
 自动扩缩容是 KubeRay 最有价值、也最容易配错的功能。它同时涉及 Ray 的内部调度需求、Kubernetes 的 Pod 调度、以及两者的资源单位对齐。

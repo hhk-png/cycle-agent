@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 I mini-deepinfer 模块、API 与测试矩阵
 
 本附录是代码索引，不是教程正文。它回答三个问题：一个模块对外暴露什么、被哪些章节讲到、被哪些测试覆盖。读代码时先在这里找到入口，再回到对应章节看设计动机；改代码时先看测试矩阵，避免“改了一个模块，破坏了另一个模块的不变量”。

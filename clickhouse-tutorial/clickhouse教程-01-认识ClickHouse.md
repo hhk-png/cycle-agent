@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 01 章 认识 ClickHouse
 
 学 ClickHouse 的人常常走两条弯路。第一条是把它当成"更快的 MySQL":照着旧经验建表、写 SQL,直到某条查询慢了一百倍,才发现问题不在 SQL,而在这套系统的形状。第二条是直接跳到参数和调优,背下一堆设置项,却说不清"为什么需要它"——于是每条经验都只在那一个场景里成立。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 A. API 字段速查
 
 本附录按 CRD 列出常用字段。完整 schema 以 KubeRay v1.7.1 的 `apis/ray/v1/*_types.go` 和 CRD YAML 为准。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 7 章 MoE 与专家并行
 
 本章导读：MoE 把“参数量”和“每 token 计算量”解耦，但也把推理系统从“算一个稠密模型”变成“路由、分发、计算、回收”四步。本章讲清 top-k 路由、共享专家、EP 全对全、Mega MoE、EPLB 的两阶段算法，以及 Wide-EP 为什么能降低 decode 的每步内存流量。

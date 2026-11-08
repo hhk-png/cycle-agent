@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 51 章 Kubernetes 弹性伸缩栈：从 Pending Pod 到节点池
 
 第 9 章讲的是 Ray autoscaler 如何把“排队任务”翻译成 `replicas`，第 34 章讲的是 autoscaler v2 内部如何做实例管理和装箱。两章都停在一个边界上：**Pod 已经创建，但节点上没有容量**。本章从这个边界继续往下，讲清楚 Kubernetes 侧的第三层控制回路：kube-scheduler、Cluster Autoscaler（CA）、Karpenter、节点池、配额和 Spot。

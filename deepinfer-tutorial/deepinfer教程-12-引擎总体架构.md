@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 12 章 引擎总体架构
 
 本章导读：把 DeepInfer 拆成 entrypoint、engine、scheduler、worker、model executor、cache 六个层次，解释一次 `step()` 从 Python 到 C++ 再到 kernel 的路径。重点讲清楚三个边界：调度与执行的边界、Python 与 C++ 的边界、计算与通信的边界。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 前言与导读
 
 这本书不打算再写一份"ClickHouse 语法大全"——那样的资料官方文档已经足够多。它要回答的是另一类问题:**它为什么这么做?这条行为背后的机制是什么?什么条件下它不成立?**

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 17 章　全文检索与 BM25
 
 一个向量库为什么非得自己带一套全文检索？答案不是"功能齐全显得厉害"，

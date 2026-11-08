@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 38 章 从 MiniKubeRay 到生产 Operator：移植与二次开发
 
 MiniKubeRay 用 Python + 进程内 Store 把控制逻辑讲清楚；生产 KubeRay 用 Go + controller-runtime + 真实 API Server。本章给出一条可执行的移植路线：哪些代码可以直接搬，哪些必须重写，每一步如何验收。

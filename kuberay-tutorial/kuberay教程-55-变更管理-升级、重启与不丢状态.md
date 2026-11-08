@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 55 章 变更管理：升级、重启与不丢状态
 
 前 54 章分别讲了字段、控制器、故障和运维。本章把它们收束成一个日常问题：**一个正在承载训练的 RayCluster，怎么改才不会把正在跑的东西弄丢？**

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 10 章 RayJob：提交模式、生命周期与清理
 
 RayJob 把“建 Ray 集群 + 提交作业 + 清理资源”封装成一个 CR。它适合训练、批推理、数据预处理这类一次性任务。

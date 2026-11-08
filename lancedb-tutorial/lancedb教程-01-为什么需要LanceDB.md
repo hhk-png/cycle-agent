@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 1 章　为什么需要 LanceDB
 
 这一章回答一个问题：**向量检索这件事，明明已经有 FAISS、Milvus、Qdrant、

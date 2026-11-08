@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 E:MySQL 与 PostgreSQL 迁移 playbook
 
 前面各章把"从 MySQL / PostgreSQL 迁过来"当成一条独立的阅读路径反复提起:第 02 章 §02.8 讲五个心态转变,第 03 章 §03.5 与 §03.9 讲类型语义,第 15 章讲 JOIN 要小心,第 17 章 §17.22 挑出"同名不等价"的那批函数,第 18 章讲更新是异步的,第 28 章给反模式清单。那些都是**筛选器**:告诉你哪些地方会咬人。这一份是**流程**:先做什么、后做什么、每一步的产出物是什么、什么算做完。

@@ -166,6 +166,11 @@ def main() -> int:
             errors.append(f"missing chapter: {filename}")
             continue
         text = path.read_text(encoding="utf-8")
+        # An optional publisher header (repository/blog address) may sit above the H1;
+        # drop it so the title checks below still see the H1 on the first line.
+        text = re.sub(
+            r"\A\*\*[^\n]*github\.com/hhk-png/cycle-agent[^\n]*\*\*\n\n", "", text, count=1
+        )
         if not text.startswith("# "):
             errors.append(f"{filename}: missing level-1 title")
         first_line = text.splitlines()[0]

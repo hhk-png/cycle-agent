@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 28 章 LLM 推理平台：Ray Serve、vLLM 与 SGLang
 
 LLM 推理把 KubeRay 的几个能力推到了极限：GPU 昂贵、模型加载慢、请求长、流量突发、升级不能丢请求。RayService 正好提供了“多副本 Serve + active/pending 升级 + Gateway 流量切换”的组合，但它不是开箱即用的推理平台。本章讲清楚怎么做、哪里会坏、如何衡量。

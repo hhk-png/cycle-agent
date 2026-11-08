@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 5 章 RayCluster CRD 深度解析
 
 `RayCluster` 是 KubeRay 的核心 CRD。RayJob 的 `rayClusterSpec`、RayService 的 `rayClusterConfig`、RayCronJob 的 `jobTemplate.rayClusterSpec` 都是它的子集或模板。读懂 RayCluster，其他三个 CRD 就只是生命周期的差异。

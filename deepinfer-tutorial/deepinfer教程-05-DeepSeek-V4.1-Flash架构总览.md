@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 5 章 DeepSeek-V4.1-Flash 架构总览
 
 本章导读：DeepInfer 的很多设计只有放回 V4.1-Flash 的模型结构里才讲得通。本章先给出公开资料中的模型规格，再解释 CED、CSA2、Engram、mHC、MoE 和 DSpark 各自解决什么问题，以及它们如何改变推理系统的瓶颈。最后给出一张“模型结构 -> 引擎机制”的对应表。

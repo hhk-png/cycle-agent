@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 02 章 快速上手
 
 读完前一章,你应该已经认同"它和 MySQL 不是一回事"。但从"认同"到"手上真有一张能查的表",中间还隔着四道小坎:装起来、配明白、会连着用、建出第一张表。

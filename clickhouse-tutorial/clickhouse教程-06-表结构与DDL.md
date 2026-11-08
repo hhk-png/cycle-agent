@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 06 章 表结构与 DDL
 
 建表是 ClickHouse 里最容易"一次写错、后面几个月一直在还债"的操作。`CREATE TABLE` 里那几行看起来只是语法,实际上是一次性的、几乎不可撤销的架构决策:`ORDER BY` 一旦定下,后续所有写入的物理顺序、所有范围查询能裁掉多少数据、压缩率有多高,全部被它锁死;`PARTITION BY` 选得太细,后台会因为分区数爆炸而拖着 merge 一起崩;`DEFAULT` / `MATERIALIZED` / `ALIAS` 用混了,你会看到"插进去的和读出来的不是一个东西"。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 1 章 为什么需要推理框架
 
 本章导读：从一个朴素的 `generate()` 循环出发，解释它为什么无法直接支撑在线服务，进而建立 prefill/decode、KV cache、批处理、TTFT/TPOT 和 roofline 这几个贯穿全书的坐标系。读完本章，你应该能把“推理慢”拆成计算、显存带宽、调度和通信四类原因，并且能用一组简单公式估算瓶颈。

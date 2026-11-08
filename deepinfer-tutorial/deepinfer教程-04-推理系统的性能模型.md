@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 4 章 推理系统的性能模型
 
 本章导读：用一组可手算的公式，把“模型多大、上下文多长、batch 多大、硬件多快”连起来。本书统一按 1K=1024 个 token、1M=1024K 计上下文长度；容量同时给出十进制 MB/GB 和二进制 MiB/GiB，避免把“117 MB”和“111 MiB”当成两个不同的数。你会得到 prefill/decode 的 FLOPs、KV 字节数、算术强度、TTFT/TPOT、推测解码加速比和成本下界。这些公式不追求精确到百分点，但足以判断瓶颈在哪，以及一个优化值不值得做。

@@ -745,12 +745,13 @@ async function runSync(
     const remote = detail.data;
     sp?.stopSuccess(`✔ ${article.no} ${remote.title || '(no title)'}`);
 
-    // Remote at target but success never recorded — last run was interrupted after the draft update; just publish
-    const needUpdate = remote.title !== article.title || remote.briefContent.trim() !== wantBrief;
+    // Title/brief at target is not enough: a body-only edit also needs an in-place update (otherwise the
+    // state below would record the new hash while the draft still holds the old body).
+    const contentChanged = !bodySame;
+    const needUpdate = remote.title !== article.title || remote.briefContent.trim() !== wantBrief || contentChanged;
 
     if (needUpdate) {
       // Replace the body only when the **source file really changed**: remote markdown may be normalized, so verbatim comparison would rewrite it every run
-      const contentChanged = st.contentHash !== article.contentHash;
       const sp2 = interactive ? startSpinner(`${article.no} · update draft`) : null;
       const upd = await juejin.updateDraft(
         {

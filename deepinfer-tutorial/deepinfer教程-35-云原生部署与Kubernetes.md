@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 35 章 云原生部署与 Kubernetes
 
 本章导读：推理引擎最终要跑在某种编排系统上。Kubernetes 不是唯一选择，但它把“调度、健康检查、滚动更新、弹性、隔离”这些能力标准化了。本章从 GPU/NPU 设备插件讲到 Pod 生命周期、探针、HPA/KEDA、Ingress 与 SSE、模型缓存、PD 分离的编排、优雅退出和多租户隔离，并用 `deploy/` 目录的 Dockerfile 与 `k8s.yaml` 做对照。读完本章，你应该能画出一次推理请求从 Ingress 到 Pod 再到 GPU 的完整路径，并知道每个环节会在哪里坏。

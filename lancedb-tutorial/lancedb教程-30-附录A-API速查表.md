@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 A　API 速查表
 
 这份附录是拿来"查"的，不是拿来"读"的。它分两半：

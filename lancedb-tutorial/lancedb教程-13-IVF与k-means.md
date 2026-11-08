@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 13 章　IVF 与 k-means
 
 向量检索这件事，在数据量小的时候根本不需要"算法"。把所有向量装进一个矩阵，

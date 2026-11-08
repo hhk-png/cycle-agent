@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # ClickHouse 完全教程
 
 从列存的物理布局讲到集群运维,每一层都配一个**可运行、可验证**的简化实现。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 26 章　生态与集成
 
 这一章要回答的问题是：**LanceDB 能接到哪些东西上，接的方式是什么，

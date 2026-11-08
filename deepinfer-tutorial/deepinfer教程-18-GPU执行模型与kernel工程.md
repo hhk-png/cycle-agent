@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 18 章 GPU 执行模型与 kernel 工程
 
 本章导读：前面几章反复说“decode 受带宽限制”“融合能减少 HBM 往返”“CUDA Graph 能省 launch 开销”，但这些都是结论。本章回到硬件，解释一条 kernel 在 GPU 上到底怎么执行、为什么 tiling 能改变瓶颈、FlashMLA/DeepGEMM/DeepEP 各自融合了什么、TileLang/Triton/CUDA 的取舍是什么，以及怎样用 profiler 判断一个 kernel 是算力受限、带宽受限还是延迟受限。读完本章，你应该能读懂一个推理 kernel 的设计意图，而不是逐行猜索引。

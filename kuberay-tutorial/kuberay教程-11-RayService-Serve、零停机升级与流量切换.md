@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 11 章 RayService：Serve、零停机升级与流量切换
 
 RayService 把 Ray Serve 应用和 RayCluster 打包成一个可升级的在线服务。它比 RayCluster 多做了三件事：

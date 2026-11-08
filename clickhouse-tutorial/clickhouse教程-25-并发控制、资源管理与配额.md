@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 25 章 并发控制、资源管理与配额
 
 一条 SQL 本身没错,却报 `MEMORY_LIMIT_EXCEEDED`;机器看起来还有一半内存,`top` 里的 `clickhouse-server` 也没到上限;写入突然变慢,日志里出现 `Too many parts`;某个租户跑一个 `GROUP BY` 把整台机器拖垮。这四件事看起来毫不相干,其实都落在同一层:ClickHouse 对**资源**的管理。这一章把这一层拆成四块——线程、内存、限制、配额——并说清每类问题该动哪个旋钮、为什么"调大它"经常是错误答案。

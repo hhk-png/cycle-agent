@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 12 章 RayCronJob 与批调度生态
 
 RayJob 解决“跑一次”，RayCronJob 解决“按计划反复跑”。本章先讲 RayCronJob 的真实 API（比 Kubernetes CronJob 简单很多），再讲调度语义、重入窗口、并发控制和可观测性，最后把 KubeRay 与批调度器的集成放到一张图里。

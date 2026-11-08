@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 4 章　列式编码与压缩
 
 上一章讲了文件"怎么摆"，这一章讲"页里装什么"。这一层决定了同一个数据集

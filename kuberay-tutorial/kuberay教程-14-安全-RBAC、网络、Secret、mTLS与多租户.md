@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 14 章 安全：RBAC、网络、Secret、mTLS 与多租户
 
 Ray 集群能执行任意 Python 代码，这使它天然是一个高权限工作负载。KubeRay 的安全设计必须同时覆盖控制面（operator/CRD）和数据面（Ray Pod）。本章给出一套可落地的分层模型。

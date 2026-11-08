@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 F　物化视图与派生数据
 
 ## F.1 这一篇补的是哪一层

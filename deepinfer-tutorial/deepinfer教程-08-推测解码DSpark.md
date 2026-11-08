@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 8 章 推测解码 DSpark
 
 本章导读：推测解码不是“用一个小模型替代大模型”，而是“用小模型提议、大模型并行验证”。本章推导接受概率、期望接受长度和加速比，解释 DSpark 的 Confidence Head 与可变长验证，最后说明 KV 回滚和结构化输出回滚这两个容易被忽略的正确性问题。

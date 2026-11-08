@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 30 章 KubeRay 源码导读与二次开发
 
 本章给出一条读 KubeRay 源码的路径：先理解 controller-runtime 的骨架，再按“类型 → 默认值/校验 → 调和 → Pod/Service 构造 → 状态”的顺序读四个控制器，最后看如何加字段、跑测试、提 PR。目标不是逐行读完，而是能在需要时快速定位。

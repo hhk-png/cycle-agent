@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 33 章 工程化：从可运行到可维护
 
 本章导读：一个推理引擎“能跑”与“能维护”之间隔着很多东西：配置如何生效、错误如何分类、日志如何定位一次请求、测试如何覆盖状态机、版本如何兼容、发布如何回滚。本章把这些看似“外围”的工作拆开，给出可以照做的工程约束，并用 mini-deepinfer 的 `config.py`、`errors.py`、`metrics.py`、`tracing.py`、`gateway.py`、`manifest.py` 和 `check_docs.py` 做对照。读完本章，你应该能判断一个推理项目离“可长期运行”还有多远。

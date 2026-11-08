@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 18 章 未来方向：Roadmap 与生态趋势
 
 本章基于 KubeRay v1.7.1（2026-09）和 Ray 2.59 的公开信息，讨论已经出现的功能和可以合理预期的方向。**不要把它当作承诺**；具体版本以官方 release notes 为准。

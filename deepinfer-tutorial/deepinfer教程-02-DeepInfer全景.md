@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 2 章 DeepInfer 全景
 
 本章导读：先回答“DeepInfer 是什么、不是什么”，再把它放回 DeepSeek 的生产推理系统中，解释开源仓库覆盖了哪一段、省略了哪一段。读完本章，你应该能画出 DeepInfer 的组件关系，说清楚它与 vLLM、SGLang、TensorRT-LLM 的继承和差异，并能判断一个团队是否适合使用它。

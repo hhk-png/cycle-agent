@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 42 章 可运行故障实验室：用 MiniKubeRay 复现生产事故
 
 第 37 章给了 14 个生产故障案例，但“读案例”和“亲手让它坏一次”是两回事。本章把其中最典型的 11 个场景做成可运行实验：`examples/incident_lab.py` 用确定性时钟、故障注入注解和真实的控制器代码，断言控制器在失败路径上的行为。

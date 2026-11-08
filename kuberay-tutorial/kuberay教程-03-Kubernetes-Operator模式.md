@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 3 章 Kubernetes Operator 模式
 
 KubeRay 的核心不是 YAML，而是一个持续运行的调和循环。本章用最小概念集解释 Operator，然后把这些概念一一映射到 KubeRay 和 MiniKubeRay。

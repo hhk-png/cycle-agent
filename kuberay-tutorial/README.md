@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # KubeRay 教程：从原理到可运行的简版实现
 
 > 基准版本：KubeRay **v1.7.1**（2026-09），Ray **2.59.0**，Kubernetes 1.30+（`SidecarSubmitterRestart` 需 1.35+）。

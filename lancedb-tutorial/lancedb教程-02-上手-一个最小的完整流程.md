@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 2 章　上手：一个最小的完整流程
 
 这一章用一个具体的例子把 LanceDB 的主要能力过一遍：

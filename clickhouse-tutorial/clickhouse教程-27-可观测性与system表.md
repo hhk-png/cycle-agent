@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 27 章 可观测性与 system 表
 
 "我的 ClickHouse 怎么了"——这个问题的答案几乎全在 `system` 库里。它慢在哪、内存被谁吃了、写入为什么被拒、副本落后多少、磁盘为什么涨、哪类错误在变多,全都能用一条 SQL 查出来,不用 SSH 上去翻文件。这一章要做两件事:一是把`system` 库按"回答什么问题、什么时候查它"梳理清楚;二是把最容易写错的监控判断(把累积计数器当瞬时值来做阈值告警)讲透。

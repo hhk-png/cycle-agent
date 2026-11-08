@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 09 章 DDL、ALTER 与运维语句
 
 在 MySQL 里,`ALTER TABLE` 通常意味着一件事:等。加个索引要重建,改个类型要拷贝全表,业务方得提前发公告。ClickHouse 的 `ALTER` 看起来语法更像,但它的行为逻辑完全不同 —— 有些 `ALTER` 是**毫秒级**的纯元数据操作,有些是**几分钟到几小时**的后台重写,而它返回给你的时间点,往往跟"数据改完了没有"没有关系。

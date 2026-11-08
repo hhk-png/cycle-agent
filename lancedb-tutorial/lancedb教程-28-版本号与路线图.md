@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 28 章　版本号与路线图
 
 这一章要讲一件很不性感、但踩坑率极高的事：**版本号。**

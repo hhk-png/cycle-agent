@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 K. 可运行实验与验证索引
 
 本附录把仓库里所有“可以跑的东西”集中到一张表：命令、耗时量级、证明了什么、输出里该看到什么、对应哪一章。它也是 CI 与新人 onboarding 的入口。

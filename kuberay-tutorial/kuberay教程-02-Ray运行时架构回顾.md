@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 2 章 Ray 运行时架构回顾
 
 KubeRay 只负责“把 Pod 摆好”，真正执行计算的是 Ray。要读懂 KubeRay 生成的命令、探针和端口，必须先知道一个 Ray 集群里有哪些进程、它们如何通信、失败时会发生什么。

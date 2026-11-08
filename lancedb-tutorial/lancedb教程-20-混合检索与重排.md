@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 20 章　混合检索与重排
 
 到这里为止，我们手上有两条独立的检索路径。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 22 章　嵌入函数
 
 前面二十章讲的都是"向量已经有了之后怎么办"。这一章补上前面那一步：

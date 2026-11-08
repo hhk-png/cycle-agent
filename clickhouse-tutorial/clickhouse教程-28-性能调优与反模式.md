@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 28 章 性能调优与反模式
 
 前面各章讲的是"ClickHouse 是怎么工作的",这一章讲"知道之后怎么动手"。

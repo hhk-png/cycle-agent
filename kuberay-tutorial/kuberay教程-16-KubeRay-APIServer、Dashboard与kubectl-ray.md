@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 16 章 KubeRay APIServer、Dashboard 与 kubectl-ray
 
 除了 operator，KubeRay 还提供三种“人机接口”：APIServer、Dashboard、kubectl-ray。它们不参与核心调和，但决定了平台好不好用。

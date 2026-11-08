@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 40 章 Kubernetes 网络深潜：CNI、DNS、Service、NetworkPolicy 与 mTLS
 
 前 39 章多次出现同一类故障：worker 无法加入、Dashboard 打不开、RayService 返回 503、NetworkPolicy 开启后 DNS 失效。它们的共同点是：**Ray 的控制面逻辑没有问题，问题出在数据包根本没有到达该到的地方**。

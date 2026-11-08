@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 07 章 SQL 语法全貌:SELECT
 
 写惯了 MySQL 的人第一次用 ClickHouse,最容易出的错不是"函数名忘了",而是**把一个子句放错了位置**——把过滤条件写进 `HAVING` 而不是 `WHERE`,在 `WHERE` 里引用聚合结果,以为 `WITH` 会像 PostgreSQL 的 CTE 那样只跑一次,或者没意识到 `SELECT` 里的别名会反向覆盖掉 `WHERE` 里的真实列。这些错误的共同点是:它们都能通过语法检查,都能跑出**结果**,只是结果不是你想要的。

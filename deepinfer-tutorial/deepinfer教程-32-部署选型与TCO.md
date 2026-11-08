@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 32 章 部署选型与 TCO
 
 本章导读：把第 30 章的单位经济和第 15 章的并行设计落到部署上。本章讨论硬件选型、集群拓扑、P/D 配比、存储与网络、云 vs 自建、TCO 模型、容量规划和合规检查。最后给出一张可以直接改的部署清单和一个可复算的案例。

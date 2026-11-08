@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 31 章 竞争格局与开源战略
 
 本章导读：推理框架不是只有 DeepInfer。vLLM、SGLang、TensorRT-LLM、TGI、LMDeploy、llama.cpp 各有定位。本章按模型覆盖、硬件、功能、生态和商业模式比较它们，解释 DeepInfer 为什么选择“只开源计算引擎”的边界，以及这个选择对用户和竞争者的含义。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # DeepInfer 教程：从生产推理系统到可运行的最小实现
 
 这是一本关于 DeepSeek 开源的 **DeepInfer** 推理框架的中文教程，同时附带一个只依赖 Python 标准库和 NumPy 的**可运行迷你实现**。教程试图同时回答四个问题：

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 10 章　标量过滤与谓词下推
 
 上一章的实测里出现过一个难看的数字：**一张 20,000 行的表删掉 99% 的行之后，

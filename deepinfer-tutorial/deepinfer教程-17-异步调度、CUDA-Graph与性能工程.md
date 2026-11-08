@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 17 章 异步调度、CUDA Graph 与性能工程
 
 本章导读：decode 的每一步都有 CPU 调度、GPU forward、采样、后处理。同步执行时，GPU 会在 CPU 阶段空转。本章解释 DeepInfer 的 zero-overhead scheduling（ZOS）如何把 CPU 和 GPU 重叠，CUDA Graph 如何消除 kernel launch 开销，以及怎样用 benchmark 和 trace 得到可信的数字。

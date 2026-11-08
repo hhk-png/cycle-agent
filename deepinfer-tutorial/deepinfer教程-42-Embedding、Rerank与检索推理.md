@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 42 章 Embedding、Rerank 与检索推理
 
 本章导读：生成式推理输出 token，表示式推理输出向量。两者都跑在 GPU 上，但瓶颈、批处理方式、缓存对象和成本模型完全不同。Embedding 服务要在高 QPS 下把短文本压成向量，Rerank 服务要在候选集上做 pairwise 打分，向量索引要在召回率、延迟和内存之间取舍。本章把这条“检索推理”链路拆成五段：编码、批处理、索引、重排、评测，并用 `mini_deepinfer/embedding.py` 把每一段跑成可测试的代码。DeepInfer 不覆盖这条路径，但任何推理平台最终都会遇到它。

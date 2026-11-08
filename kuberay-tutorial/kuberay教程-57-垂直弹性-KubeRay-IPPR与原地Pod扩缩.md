@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 57 章 垂直弹性：KubeRay IPPR 与原地 Pod 扩缩
 
 前面所有关于 autoscaler 的章节都默认一个方向：**加 Pod、删 Pod**。但很多 Ray 负载的瓶颈不是“Pod 数量不够”，而是“每个 Pod 太小”：一个 worker 只有 1 核，pending task 需要 3 核；横向扩到 3 个 Pod 能解决问题，却带来 3 份启动时间、3 份对象存储、3 份镜像拉取和更碎的调度。

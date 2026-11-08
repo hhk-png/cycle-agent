@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 3 章 快速上手与源码地图
 
 本章导读：把“跑起来”和“看得懂”分成两步。先给出 DeepInfer 的构建、离线推理和常见参数，再给出一条从 entrypoint 到 kernel 的源码阅读路线。最后用 mini-deepinfer 的同等入口做对照，让你在没有 SM100 的机器上也能跑同一套概念。

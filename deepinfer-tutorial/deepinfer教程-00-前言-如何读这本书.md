@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 0 章 前言：如何读这本书
 
 本章导读：说明这本书要解决的问题、读者路径、代码约定、验证口径和章节之间的关系。读完之后，你应该知道哪些章节必须按顺序读，哪些可以按需跳读，以及“mini-deepinfer 能跑”到底证明了什么、没有证明什么。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 15 章　HNSW
 
 前面两章都在**压缩**：IVF 压缩候选集、PQ 压缩向量本身。这一章走一条

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 22 章 实现：RayJob、RayService 与 RayCronJob
 
 本章拆三个“上层”控制器：它们复用 RayCluster，但各自有独立的状态机和清理语义。

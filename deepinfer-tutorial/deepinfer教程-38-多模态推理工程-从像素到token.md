@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 38 章 多模态推理工程：从像素到 token
 
 本章导读：DeepSeek-V4.1-Flash 是多模态模型，但“支持图片”不等于“图片免费”。一张图要经过解码、缩放、patch 切分、视觉编码、aligner 投影，最后变成 LLM 上下文里的若干 token；这些 token 会占用 prefill 算力、KV 显存和缓存带宽。本章把这条链路拆成可计算的部分：图像如何变成 token、token 预算怎么估、视觉编码器如何批处理、图像 embedding 如何缓存、EPD 如何分离，以及质量评测为什么不能只看“能不能识别”。读完本章，你应该能在看到一张图片和一套预处理配置时，算出它要花多少 token、多少 KV、多少视觉编码算力，并知道哪些优化是真收益、哪些只是把成本挪到了别处。

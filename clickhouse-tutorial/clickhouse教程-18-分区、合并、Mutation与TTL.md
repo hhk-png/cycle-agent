@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 18 章 分区、合并、Mutation 与 TTL
 
 第 05 章说"part 写了就不改",把优雅的读路径建立在不可变性上。代价全都集中到这一章:既然不能改,那么"删数据""改数据""让数据过期""把旧 part 变少"这四件事都得另想办法。答案是四条互相配合的后台流水线——**合并(merge)**把碎 part 收敛成大 part,**partition 操作**做整块的秒级搬运与删除,**mutation** 靠重写 part 来表达 `UPDATE`/`DELETE`,**TTL** 让过期数据自己消失。它们共享同一批后台线程,也共享同一套"异步、最终一致"的脾气。不懂这一点,你就会在"为什么 `DELETE` 完还能查到""为什么表突然报 too many parts""为什么磁盘满了却删不掉数据"这些问题上反复踩坑。

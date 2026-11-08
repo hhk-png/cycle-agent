@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 37 章 生产故障案例与复盘
 
 前面各章讲的是“系统应该怎样工作”。本章讲“它实际怎样坏掉”。下面 14 个案例都来自 KubeRay 生产环境的高频模式：每个案例给出症状、时间线、根因、诊断命令、修复和预防。你可以把它们当作 on-call 的剧本，也可以当作故障演练的题库。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 49 章 平台治理：准入控制、策略即代码与供应链安全
 
 第 14 章从攻击面讲安全：RBAC、NetworkPolicy、Secret、mTLS、多租户。本章换一个角度：**怎样在对象进入集群之前就阻止错误配置，怎样证明镜像和清单没有被篡改，以及怎样让策略本身像代码一样被测试、评审和回滚**。

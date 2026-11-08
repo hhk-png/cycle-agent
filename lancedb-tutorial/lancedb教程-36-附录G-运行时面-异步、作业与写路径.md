@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 G　运行时面：异步、作业与写路径
 
 ## G.1 这一篇补的是哪一层

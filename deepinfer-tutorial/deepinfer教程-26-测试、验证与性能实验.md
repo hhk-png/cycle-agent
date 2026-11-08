@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 26 章 测试、验证与性能实验
 
 本章导读：一个推理实现“能跑”不等于“正确”。本章给出 mini-deepinfer 的测试分层、关键断言、验证命令和性能实验方法，并讨论“测试全绿但实现有 bug”的常见原因。读完本章，你应该能为自己的推理项目设计一套最小但有效的验证集。

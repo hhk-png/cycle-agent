@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 19 章　查询规划与执行
 
 前面各章分别讲了存储、索引、过滤、向量检索。这一章把它们串起来：

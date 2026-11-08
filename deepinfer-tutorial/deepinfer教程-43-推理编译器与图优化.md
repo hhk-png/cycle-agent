@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 43 章 推理编译器与图优化
 
 本章导读：模型代码是“一堆张量运算”，GPU 执行的是“一串 kernel”。中间隔着一层编译器：它把运算组织成图，做常量折叠、死代码消除、算子融合、内存规划和 kernel 选择，最后交给运行时执行。第 17 章讲 CUDA Graph 如何省 launch 开销，第 18 章讲单个 kernel 怎么写；本章补上中间这一层，解释“为什么同样的数学，编译后的执行计划能差几倍”，并用 `mini_deepinfer/compiler.py` 把图优化、融合和内存规划跑成可测试的代码。

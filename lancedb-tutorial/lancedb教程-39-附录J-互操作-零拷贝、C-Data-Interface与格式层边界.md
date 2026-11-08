@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 J　互操作：零拷贝、C Data Interface 与格式层边界
 
 ## J.1 这一篇补的是哪一层

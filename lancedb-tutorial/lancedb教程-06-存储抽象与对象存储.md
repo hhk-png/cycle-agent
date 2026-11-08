@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 6 章　存储抽象与对象存储
 
 上一章讲的是表和列的语义。这一章往下走一层：这些数据文件和 manifest

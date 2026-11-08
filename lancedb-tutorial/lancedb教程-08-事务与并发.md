@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 8 章　事务与并发
 
 上一章说"提交就是写一个新的 manifest 文件"。这一章回答一个更硬的问题：

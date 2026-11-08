@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 21 章 实现：控制器、调度器、Kubelet 与自动扩缩容
 
 本章沿着 RayCluster 的生命周期，拆解 `base.py`、`builders.py`、`batch.py`、`raycluster.py` 和 `autoscaler/policy.py`。

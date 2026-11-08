@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 3 章　Lance 文件格式
 
 LanceDB 的性能、成本、能力边界，八成都能追溯到它底下的那层文件格式。

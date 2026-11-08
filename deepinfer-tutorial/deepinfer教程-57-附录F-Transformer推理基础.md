@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 F Transformer 推理基础
 
 本附录给第一次接触大模型推理的读者补上最小必要的背景。它不追求覆盖 Transformer 的全部变体，只解释“一个 token 如何变成下一个 token 的概率”，以及推理引擎为什么要在这些步骤上做优化。读完本附录，你可以回到第 1、5、6 章，把 prefill/decode、KV cache、GQA、RoPE、采样等概念放回具体计算。

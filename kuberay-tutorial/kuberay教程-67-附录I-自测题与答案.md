@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 I. 自测题与答案
 
 本附录用 78 道题覆盖全书主线。建议先自己回答，再对照答案；答案只给要点，详细推导见对应章节。

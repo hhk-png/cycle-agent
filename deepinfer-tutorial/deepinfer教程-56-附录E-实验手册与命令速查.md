@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 E 实验手册与命令速查
 
 本附录是“动手做”的入口。它把全书用到的命令、预期输出、故障排查和实验步骤集中在一起。所有命令都在仓库根目录 `deepinfer-tutorial/` 执行，默认 Python 3.10+、NumPy、pytest 已安装。

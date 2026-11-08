@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 31 章 升级、迁移、离线安装与灾难恢复
 
 生产 KubeRay 平台最危险的动作不是创建集群，而是升级和迁移：CRD 变更、operator 行为变化、Ray 镜像升级、API 版本弃用、离线环境、灾备切换。本章给出可执行的流程和回滚预案。

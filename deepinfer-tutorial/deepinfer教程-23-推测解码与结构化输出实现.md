@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 23 章 推测解码与结构化输出实现
 
 本章导读：本章逐段解释 `speculative.py` 和 `structured_output.py`。你会看到 draft 提议、置信度代理、变长验证、接受/拒绝、KV 逻辑回退，以及正则/JSON/EBNF 到 NFA 的编译、mask、trigger/bound 和 snapshot/restore。最后说明这两个模块组合时的取舍。

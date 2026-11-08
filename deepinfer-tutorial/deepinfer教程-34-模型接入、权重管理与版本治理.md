@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 34 章 模型接入、权重管理与版本治理
 
 本章导读：推理引擎的性能上限，早在权重加载那一刻就被决定了：权重放在哪里、按什么格式切分、用什么精度读取、和 tokenizer 是否对齐、和 KV 格式是否兼容。本章从模型仓库的文件结构讲到 safetensors 的 mmap、分片索引、张量并行切分、量化 scale 布局、warmup 形状和 manifest 校验，最后给出 mini-deepinfer 的 `manifest.py` 实现和一套上线检查清单。读完本章，你应该能独立把一个新模型接进推理服务，而不是只会调用 `from_pretrained`。

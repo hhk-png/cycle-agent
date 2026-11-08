@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 08 章 数据写入与导入
 
 一个 ClickHouse 集群跑得快不快,九成取决于两件事:数据是怎么写进来的、写进来以后变成了多少个 part。查询写得再漂亮,只要表底下躺着十万个小 part,每次 SELECT 都要打开几十万个文件句柄,列存和稀疏索引带来的优势会被 IO 开销吃得一干二净。

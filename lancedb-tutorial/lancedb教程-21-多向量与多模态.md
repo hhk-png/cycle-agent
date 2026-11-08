@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 21 章　多向量与多模态
 
 多向量列在 Lance 里的类型写作 `fixed_size_list<fixed_size_list<float16>[128]>[N]`

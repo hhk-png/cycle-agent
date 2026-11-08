@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 A 术语表
 
 本附录按主题列出书中反复出现的术语。中文解释尽量给出“它在系统里做什么”，而不是只给字面翻译。遇到正文里没展开的概念，可以先在这里找一句话定义，再回到对应章节。

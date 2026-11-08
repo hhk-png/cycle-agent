@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 A:SQL 与函数速查
 
 这一份速查是为"写到一半忘了某个语句怎么写、某个函数叫什么"这种时刻准备的:它不解释原理,只回答"名字是什么、默认值是多少、最小可用写法长什么样"。原理在对应的正文章节里;这里只保证你能在三十秒内找回语法,并且知道下一步该去第几章看细节。所有内容以 **ClickHouse 25.3** 为准;凡是拿不准的默认值,一律标 **未确认** 并说明去哪自查——自查的前两个入口是 **`system.settings`**(会话级)与 **`system.merge_tree_settings`**(表级),第三个是 **`system.settings_changes`**。这张表记录"某个设置的默认值何时变过",列为 `type`(`Session` / `Core` / `MergeTree`)、`version`、`changes`(`Array(Tuple(name, previous_value, new_value, reason, compatibility_mode))`,其中 `compatibility_mode` 取 `Apply`(允许回滚)或 `Ignore`(禁止回滚))。它是把默认值钉到版本的唯一一手手段,官方给的查法形如:

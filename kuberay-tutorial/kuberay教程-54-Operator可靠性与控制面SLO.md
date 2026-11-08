@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 54 章 Operator 可靠性与控制面 SLO
 
 前面大多数章节把 operator 当作“永远在线”的组件：它 watch CR、创建 Pod、写 status。但 operator 自己也是一个会 OOM、会重启、会选主、会限流、会缓存陈旧的分布式系统。控制面一旦不可用，表现不是“某个 Ray 任务失败”，而是**所有租户的调和同时停摆**。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 27 章　竞品对比
 
 这一章的立场是：**向量检索已经不是一个"选哪家数据库"的问题，

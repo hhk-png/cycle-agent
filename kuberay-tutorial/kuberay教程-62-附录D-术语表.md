@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 D. 术语表
 
 按主题分组；同一术语只出现一次。括号里的章节指向第一次系统讲解的位置。

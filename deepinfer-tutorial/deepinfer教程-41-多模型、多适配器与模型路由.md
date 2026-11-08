@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 41 章 多模型、多适配器与模型路由
 
 本章导读：DeepInfer 只服务一个模型，但真实平台很少只有一个 checkpoint。团队会保留一个基座模型，再挂上若干微调变体、领域适配器和不同尺寸的模型；请求进来后，先要决定“用哪个模型回答”。本章把这件事拆成三层：参数层（LoRA 如何改变权重）、服务层（一个引擎如何同时驻留和批处理多个适配器）、决策层（路由器如何在质量、延迟、成本和上下文约束下选模型）。最后用 `mini_deepinfer/lora.py` 和 `mini_deepinfer/router.py` 把三层都跑成可测试的代码。

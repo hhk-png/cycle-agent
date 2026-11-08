@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 J. 端到端时序图集
 
 正文章节解释“每个组件做什么”，本附录把它们串成“一次操作到底经过哪些步骤”。排障时先定位自己停在哪一张图的哪一步，再回到对应章节看细节。

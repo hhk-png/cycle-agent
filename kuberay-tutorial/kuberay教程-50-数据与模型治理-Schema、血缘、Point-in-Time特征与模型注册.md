@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 50 章 数据与模型治理：Schema、血缘、Point-in-Time 特征与模型注册
 
 KubeRay 能保证“作业跑完、Pod 回收、服务上线”，但不能保证：

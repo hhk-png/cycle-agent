@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 10 章 低精度、确定性与 batch invariance
 
 本章导读：低精度不是“把 dtype 改小”这么简单，它涉及 scale 布局、反量化融合、硬件支持和数值误差。更隐蔽的是确定性问题：同一个请求在不同 batch 组成下可能得到不同输出，导致评测不可复现、线上问题无法复现。本章解释 DeepInfer 如何定义和测试 batch-invariant 与 deterministic sampling，并给出 mini 的对应实验。

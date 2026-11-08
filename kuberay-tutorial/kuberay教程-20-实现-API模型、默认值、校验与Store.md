@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 20 章 实现：API 模型、默认值、校验与 Store
 
 本章拆开 MiniKubeRay 的“上半身”：对象如何表示、默认值/校验如何对齐 KubeRay、Store 如何提供 Kubernetes 语义。

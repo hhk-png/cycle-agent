@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 53 章 交互式开发与 Notebook 平台
 
 前面的章节大多在讲“作业怎么跑完”。这一章讲另一个同样重要、却经常被平台文档忽略的回路：**人怎么把代码送进集群、怎么调试、怎么在不破坏隔离的前提下反复迭代**。

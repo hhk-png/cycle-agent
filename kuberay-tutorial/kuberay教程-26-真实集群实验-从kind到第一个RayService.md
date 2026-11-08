@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 26 章 真实集群实验：从 kind 到第一个 RayService
 
 第 1–25 章用 MiniKubeRay 建立了控制平面的直觉。本章把同样的对象放到真实 Kubernetes 上：用 kind 建集群、用 Helm 安装 KubeRay、创建 RayCluster/RayJob/RayService/RayCronJob，并观察 Pod、Service、事件和日志。所有命令都可以直接复制执行。

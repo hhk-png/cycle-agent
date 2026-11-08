@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 39 章 选型与替代方案：KubeRay、托管 Ray、Slurm 与其他系统
 
 学完 KubeRay 不代表所有场景都该用 KubeRay。本章把选型问题拆成“工作负载、团队能力、隔离、成本、生态”五个维度，对比 KubeRay、托管 Ray、Kubernetes 原生批处理/训练、传统 HPC 和 Serverless GPU 平台，并给出迁移路径和 TCO 模型。

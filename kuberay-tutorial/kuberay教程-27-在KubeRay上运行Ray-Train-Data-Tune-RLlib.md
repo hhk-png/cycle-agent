@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 27 章 在 KubeRay 上运行 Ray Train / Data / Tune / RLlib
 
 KubeRay 只负责把 Ray 集群摆好；真正决定作业形态的是上层的 Ray 库。本章把四类最常见的工作负载——分布式训练、数据处理、超参搜索、强化学习——映射到 RayCluster/RayJob 的配置上，并给出可执行的 entrypoint 结构、资源规划、checkpoint 与容错做法。

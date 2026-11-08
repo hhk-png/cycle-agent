@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 12 章　向量索引总览
 
 前面讲了文件怎么摆、页里装什么、版本怎么管。从这一章开始进入查询路径。

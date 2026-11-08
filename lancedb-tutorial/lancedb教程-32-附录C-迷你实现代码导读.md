@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 C　迷你实现代码导读
 
 这份教程带了一个从零写的 LanceDB 复刻：`mini_lancedb/`，

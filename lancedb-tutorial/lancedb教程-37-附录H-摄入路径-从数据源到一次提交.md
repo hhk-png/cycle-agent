@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 H　摄入路径：从数据源到一次提交
 
 前面的正文把表建好之后的事讲得很细——查询怎么规划、索引怎么选、

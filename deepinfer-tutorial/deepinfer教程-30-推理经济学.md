@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 30 章 推理经济学
 
 本章导读：推理服务的成本由 GPU 小时、利用率、吞吐、存储和网络共同决定。本章给出一套可代入的单位经济模型，解释 DeepInfer 官方 Q&A 中“每天 155 万亿 token、每 GPU 小时 38 美元收入”的量级含义，并讨论批处理、缓存、量化和推测解码对毛利的影响。最后给出一个可以改成你团队表格的敏感性分析。

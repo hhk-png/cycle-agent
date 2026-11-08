@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 23 章 实现：APIServer、Dashboard、CLI 与指标
 
 MiniKubeRay 的接口层让同一套对象可以被 HTTP、CLI、Dashboard 访问。本章拆 `minikuberay/apiserver/`、`minikuberay/cli/`、`minikuberay/metrics.py` 和 `minikuberay/demo.py`。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 33 章 MiniKubeRay 进阶实现：History Server、Gateway API 与批调度
 
 第 19–23 章实现了 MinKubeRay 的核心控制平面。本章拆解后来补齐的四块“生产感”能力：History Server、Gateway API 增量升级、批调度/Kueue 集成、多主机与 GCS FT 清理。它们对应真实 KubeRay v1.6/1.7 的功能，也解释了第 26–31 章的运维现象。

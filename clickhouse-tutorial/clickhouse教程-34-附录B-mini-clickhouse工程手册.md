@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 B:mini-clickhouse 工程手册
 
 第 31 章把 mini-clickhouse 当成一个"可以读的故事"讲了一遍——为什么这么设计、和真实 ClickHouse 差在哪。这份附录解决的问题完全不同:**当你想查"这个实现里 X 是怎么做的"时,翻这里。** 它由六部分组成:真实的文件树(带行数)、逐功能的能力矩阵、照源码抄下来的 API 签名、三个"怎么加一个新东西"的步骤模板、验证手段,以及一份可扫读的陷阱清单,最后是九个练习。

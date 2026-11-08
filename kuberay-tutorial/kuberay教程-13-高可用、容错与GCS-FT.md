@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 13 章 高可用、容错与 GCS FT
 
 Ray 的架构决定了 head 是单点：GCS 在 head 上，worker 通过 head 注册。KubeRay 不能把 Ray 变成无状态系统，但可以通过 GCS 容错、RayService 多集群、重试和存储设计，把故障影响降到可接受。

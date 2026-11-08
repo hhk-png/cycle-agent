@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 B　术语表
 
 这份表解决一个具体问题：**同一个概念，在不同的中文资料里被翻成了不同的词，

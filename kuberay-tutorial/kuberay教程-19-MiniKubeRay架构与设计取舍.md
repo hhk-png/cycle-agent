@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 19 章 MiniKubeRay 架构与设计取舍
 
 从本章开始进入实现部分。MiniKubeRay 的目标不是“再写一个 KubeRay”，而是把控制平面拆成可以逐行调试的零件。它必须：

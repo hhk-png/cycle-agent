@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 46 章 弹性分布式训练：Ray Train、TorchElastic、Checkpoint 与故障恢复
 
 第 27 章从使用者视角给出了 `TorchTrainer` 模板。本章继续往下：**当一张 GPU 掉了、一个 worker 被驱逐、world size 从 4 变成 2 再变成 6 时，训练为什么还能继续，以及哪些情况下不能继续**。

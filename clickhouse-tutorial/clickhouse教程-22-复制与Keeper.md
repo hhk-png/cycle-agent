@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 22 章 复制与 Keeper
 
 一台 ClickHouse 服务器宕机,你存在上面的数据就全没了——没有生产系统能接受这个单点。复制(replication)解决的就是这件事:同一份数据在多个节点上各存一份,挂掉一个不影响整体。但这个看似简单的目标在 ClickHouse 里的实现方式相当特别:副本之间**几乎不互相通信**,而是共同依赖一个位于架构正中的独立服务——Keeper。这一章讲清楚这套机制为什么长这样,以及运维时该盯哪些指标。

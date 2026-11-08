@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 10 章 查询执行引擎
 
 同一条 `SELECT`,在 MySQL 上跑一分钟,在 ClickHouse 上跑两百毫秒,很多人第一反应是"列存快"。列存确实快,但它解释不了另一件事:把 ClickHouse 的 CPU 监控打开,你会看到查询期间**每个核都在满载**;而在一台 64 核的机器上跑一个 `GROUP BY`,MySQL 大概率只用了一个核。这个差别不在存储格式上,在执行模型上。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 29 章　未来方向
 
 这一章讲"往前看"。它和前面所有章节的性质不同：前面的内容都能在本地跑出来验证，

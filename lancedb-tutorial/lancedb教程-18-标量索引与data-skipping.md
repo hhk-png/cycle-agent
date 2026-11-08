@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 18 章　标量索引与 data skipping
 
 向量索引和标量索引的目标**完全不同**，这一点决定了它们从头到尾的接口形态都不一样。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 36 章 GPU 与异构资源调度：device plugin、MIG、DRA 与拓扑
 
 KubeRay 的 Pod 最终要落到节点上。CPU 调度相对简单，GPU/TPU/NIC 则涉及设备插件、拓扑、显存隔离和 gang scheduling。本章从 Kubernetes 设备模型讲到 KubeRay 的资源配置，目标是让你能回答：

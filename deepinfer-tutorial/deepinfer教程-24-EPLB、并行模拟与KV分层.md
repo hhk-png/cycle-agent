@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 24 章 EPLB、并行模拟与 KV 分层
 
 本章导读：本章把 mini-deepinfer 里几个“分布式相关”的模块放在一起：EPLB、CP/EP/TP/PD 的逻辑模拟、KV block store。它们都不启动真实的多进程通信，但都保留了分区、通信和交接的逻辑，可以用来验证正确性和做小规模实验。

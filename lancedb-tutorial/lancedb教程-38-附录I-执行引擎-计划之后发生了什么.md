@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 I　执行引擎：计划之后发生了什么
 
 ## I.1 这一篇补的是哪一层

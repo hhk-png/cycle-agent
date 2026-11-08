@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 E　怎么验证一个存储引擎
 
 这份附录讲一件教程正文里反复出现、却从没集中讲过的事：

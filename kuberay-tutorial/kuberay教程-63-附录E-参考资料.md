@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 E. 参考资料
 
 > 版本基准：KubeRay v1.7.1（2026-09），Ray 2.59.0。文档 URL 可能随版本变化；以官方最新页面为准。

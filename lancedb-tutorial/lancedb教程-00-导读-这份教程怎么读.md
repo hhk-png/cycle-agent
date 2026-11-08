@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 0 章　导读：这份教程怎么读
 
 ## 0.1 这份教程想解决什么问题

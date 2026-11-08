@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 51 章 结语与路线图
 
 本章导读：把全书的主线收束成一张路线图。你会看到 DeepInfer 的设计逻辑、mini-deepinfer 的验证边界，以及从“读懂”到“做出来”的下一步。最后给出一份可以按周执行的练习计划。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 34 章 Autoscaler v2 内部机制与容量模型
 
 第 9 章从使用者视角讲了 `enableInTreeAutoscaling`、`minReplicas`、`maxReplicas`、`idleTimeoutSeconds` 和 `upscalingMode`。本章往下走一层：Ray autoscaler v2 如何把“待调度资源”变成“节点类型 + 实例数”，KubeRay 如何把这些实例变成 Pod，以及为什么扩容经常“看起来没反应”。

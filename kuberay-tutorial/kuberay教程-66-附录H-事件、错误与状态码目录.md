@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 H. 事件、错误与状态码目录
 
 本附录把 KubeRay 常见的 condition、event、status、HTTP 错误和日志关键词集中起来，用于 on-call 时快速对照。事件/原因在不同版本可能变化；以你集群的实际输出为准。

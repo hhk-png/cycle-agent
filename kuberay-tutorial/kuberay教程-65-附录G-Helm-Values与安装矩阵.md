@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 G. Helm Values 与安装矩阵
 
 本附录把 KubeRay 的安装参数集中到一页，方便在 dev/kind、生产 HA、多租户和离线环境之间切换。具体 values 键名以你使用的 chart 版本为准；安装前先：

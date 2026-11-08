@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 17 章 生产运行手册
 
 本章把前面章节落到运维动作：安装、升级、容量、监控、故障排查、变更流程。目标是让 on-call 在凌晨三点也能按步骤定位问题。

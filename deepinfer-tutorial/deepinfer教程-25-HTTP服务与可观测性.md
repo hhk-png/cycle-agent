@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 25 章 HTTP 服务与可观测性
 
 本章导读：引擎有了，怎样把它变成一个服务？本章拆开 mini 的 OpenAI 兼容 HTTP server、SSE 流式输出、指标端点和并发模型，并说明它与生产网关的差距。最后给出可观测性的最小集合、排障顺序和从单锁到多副本的演进路线。

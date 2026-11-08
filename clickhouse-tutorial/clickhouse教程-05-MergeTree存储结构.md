@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 05 章 MergeTree 存储结构
 
 同一张一亿行的表,`SELECT count(*)` 几毫秒返回,`SELECT * WHERE id = 42` 也要几毫秒,而 `SELECT max(price)` 可能比前两者都慢——这些差异不是运维调出来的,是**数据在磁盘上的排布方式**决定的。这一章把 MergeTree 的 part 拆开看:一个 part 目录里有哪些文件、每个文件回答什么问题、`primary.idx` 与 `<col>.mrk2` 里到底存了什么。读懂这些,你就能在看执行计划之前,先在心里估算一条查询"该读多少字节"。

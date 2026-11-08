@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 24 章 测试、验证与故障注入
 
 “能跑”不是一句口号。本章给出 MiniKubeRay 的验证体系：测试分层、确定性时钟、故障注入、文档一致性检查和端到端演示。

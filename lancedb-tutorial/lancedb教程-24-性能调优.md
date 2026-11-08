@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 24 章　性能调优
 
 前几章散落着很多实测数字。这一章把它们组织成一套**可执行的调优方法**：

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 32 章 平台实战：多租户 Ray 平台设计
 
 前面各章是零件：CRD、控制器、调度、网络、存储、可观测性、安全、成本。本章把它们组装成一个可运营的多租户 Ray 平台，回答“如果我要给 5 个团队、200 个数据科学家、几十张 GPU 提供 Ray，应该怎么设计”。

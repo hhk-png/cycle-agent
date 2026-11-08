@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 25 章 练习、扩展路线与真实 KubeRay 的差距
 
 本教程的目标不是让你“背完 KubeRay”，而是让你能改、能测、能判断。本章给出练习、扩展路线和与真实实现的差距。

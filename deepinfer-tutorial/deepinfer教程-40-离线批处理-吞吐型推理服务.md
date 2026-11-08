@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 40 章 离线批处理：吞吐型推理服务
 
 本章导读：DeepInfer 开源的入口是离线推理，但“离线”不等于“把请求一次性丢给模型”。离线服务有自己的目标函数：在截止时间前完成尽可能多的请求，把 GPU 利用率拉高，把单位 token 成本压低。它关心的不是单个用户的 TTFT，而是整个批次的 makespan、尾延迟、失败重试和可恢复性。本章讲批量规划、调度策略、检查点、计费口径和成本模型，并用 mini-deepinfer 的 `offline_batch.py` 把这些概念跑成一份可审计的报告。

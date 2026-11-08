@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 56 章 Ray 活体诊断：State API、ray CLI 与证据链
 
 上一章讲怎么安全地改；本章讲改坏了、或者没改却坏了的时候，怎么在**不重启、不猜**的前提下定位。

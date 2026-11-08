@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 20 章 mini-deepinfer 的设计与边界
 
 本章导读：在写代码之前，先明确 mini-deepinfer 要证明什么、不证明什么。本章给出设计目标、模块划分、保真度矩阵和关键取舍。读完本章，你应该能判断某个 DeepInfer 机制在 mini 里对应哪段代码、差距在哪里，以及为什么这些差距是规模问题还是能力问题。

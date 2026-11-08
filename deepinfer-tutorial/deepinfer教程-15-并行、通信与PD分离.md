@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 15 章 并行、通信与 PD 分离
 
 本章导读：单卡放不下模型，或者单卡吞吐不够时，就要并行。本章区分 DP、TP、EP、CP 四种并行，解释 DeepInfer 为什么在 decode 选 Wide-EP、在 prefill 选小 EP/DP，讲清 all-reduce、all-gather、all-to-all 的代价，最后拆开 E/P/D 分离和负载均衡器。

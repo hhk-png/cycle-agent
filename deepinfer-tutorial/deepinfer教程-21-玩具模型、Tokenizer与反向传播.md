@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 21 章 玩具模型、Tokenizer 与反向传播
 
 本章导读：本章进入 mini-deepinfer 的模型层。你会看到字节级 tokenizer、2 层 GQA Transformer、RoPE/RMSNorm/SwiGLU、分页 KV 前向，以及一份不依赖自动微分的手写反向传播。最后介绍 `v4lite.py` 里的 MoE、Engram、CED、mHC 机制实验室，以及量化、稀疏注意力和视觉编码实验室。

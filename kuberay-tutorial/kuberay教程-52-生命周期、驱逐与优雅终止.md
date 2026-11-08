@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 52 章 生命周期、驱逐与优雅终止
 
 KubeRay 负责把 Pod 创建出来，但 Pod 怎么结束，主要由 Kubernetes 和 Ray 运行时决定。生产上大量“看起来像 KubeRay bug”的问题，最后都落在同一条时间线上：

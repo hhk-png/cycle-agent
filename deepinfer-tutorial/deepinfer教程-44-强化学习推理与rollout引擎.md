@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 44 章 强化学习推理与 rollout 引擎
 
 本章导读：前面四十多章把推理引擎当成“服务用户”的系统：请求进来，token 流出去，优化目标是 TTFT、TPOT、goodput 和单位成本。强化学习后训练把同一个引擎变成“训练器的采样器”：一个 prompt 要生成一组回答，训练器需要行为策略的 log-probability，权重每隔几步就更新，rollout 还可能被挂起、恢复或丢弃。本章解释这些差异如何改变调度、KV、正确性和成本模型，并用 `mini_deepinfer/rl_rollout.py` 把组规划、GRPO 优势、权重版本和部分 rollout 跑成可测试的代码。

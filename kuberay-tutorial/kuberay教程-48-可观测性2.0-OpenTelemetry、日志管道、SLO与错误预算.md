@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 48 章 可观测性 2.0：OpenTelemetry、日志管道、SLO 与错误预算
 
 第 8 章建立了五层模型（status/conditions/events/logs/metrics），并给出了 KubeRay 与 Ray 的指标与日志入口。本章补上现代平台真正需要的第四类信号 **trace**，以及把信号变成决策的 **SLO/错误预算**。

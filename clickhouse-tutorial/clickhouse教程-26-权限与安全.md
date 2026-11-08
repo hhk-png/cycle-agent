@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 26 章 权限与安全
 
 一个没配权限的 ClickHouse 实例,只要能被网络摸到,任何人就能 `DROP DATABASE`。这一章解决两件事:一是**怎么用 SQL 把这台机器管住**——建用户、发权限、按行过滤、给租户设上限;二是**怎么把攻击面收窄**——哪些端口、哪些表函数、哪些默认配置是必须先处理的。ClickHouse 的访问控制和"改配置文件再重启"是两代思路,这一章会把新那代讲透。

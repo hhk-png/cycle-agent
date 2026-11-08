@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 16 章　标量量化与二值量化
 
 PQ 是"把维度切段、每段查码本"，压缩比靠的是子空间分解。这一章讲两条

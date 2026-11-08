@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 14 章 KV cache 系统
 
 本章导读：KV cache 是推理系统里最贵的资源。本章从分页、前缀哈希、copy-on-write 讲到 DeepInfer 的 block KV、SWA state、3FS 存储、TTL 和跨机传输。读完之后，你应该能算出“一条 128K 请求要多少页、能和其他请求共享多少、什么时候该换出”。

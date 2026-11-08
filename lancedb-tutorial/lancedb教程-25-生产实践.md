@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 25 章　生产实践
 
 前面几章讲的都是"能不能做"。这一章讲"做起来会在哪里疼"。

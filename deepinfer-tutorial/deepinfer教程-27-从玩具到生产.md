@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 27 章 从玩具到生产
 
 本章导读：mini-deepinfer 证明了机制，但没有证明生产可用。本章给出一张差距清单，按“硬件、模型、并行、存储、服务、运维”六层拆解，并给出一条从 toy 到生产的迁移路线。读完本章，你应该知道下一步该补什么、先补什么、哪些可以直接复用。

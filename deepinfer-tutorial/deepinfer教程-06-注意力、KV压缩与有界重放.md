@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 6 章 注意力、KV 压缩与有界重放
 
 本章导读：从标准注意力一路讲到 CSA2、SWA、YoCo 和 FP4 KV。重点不是背公式，而是理解每个压缩手段把哪一项成本降下来、又引入了什么新的系统复杂度。读完本章，你应该能解释 890 字节/token 是怎么来的，以及为什么“缓存命中”不等于“可以直接 decode”。

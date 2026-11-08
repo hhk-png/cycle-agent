@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 11 章　表达式引擎
 
 前两章反复用到 `WHERE n > 19000` 这句话。但它在引擎内部不是一个字符串，

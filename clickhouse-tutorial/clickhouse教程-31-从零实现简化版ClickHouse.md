@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 31 章 从零实现简化版 ClickHouse
 
 读了前面三十章,你对 ClickHouse 的每一块应该都有概念了,但这些概念是**分开**装进脑子里的:列存、granule、稀疏索引、part、processor、聚合状态、格式、编解码器……它们之间的依赖关系、谁必须在谁之前、拿掉哪一块整个东西就塌了,光靠读文档很难有体感。这一章换一个方向:**把这些部件用 Python 从零重写一遍**,规模控制在能读完、能跑起来、能改动的量级,然后逐块对照真实 ClickHouse,看它"必须这么做"的理由是什么,以及我们的简化在哪一步付出了代价。

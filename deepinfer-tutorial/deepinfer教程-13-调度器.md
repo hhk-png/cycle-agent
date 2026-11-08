@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 13 章 调度器
 
 本章导读：调度器决定每个 step 做什么、让谁做、做多少。本章拆开 DeepInfer C++ 调度器的 prefill/decode 分支、DP 组投票、chunked prefill、LCFS、抢占和前缀缓存，并用 mini-deepinfer 的 Python 实现做对照。读完本章，你应该能解释“为什么这一步做 prefill 而不是 decode”以及“显存不够时牺牲谁”。

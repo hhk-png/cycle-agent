@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # LanceDB 教程：从文件格式到一个能跑起来的迷你实现
 
 这份教程讲 **LanceDB** 和它底下的 **Lance 列式格式**。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 58 章 Kubernetes 新原语与 KubeRay：原生 sidecar、调度门、拓扑感知与 Pod 级资源
 
 KubeRay 不是一座孤岛。它生成的 Pod 最终要交给 kube-scheduler、kubelet、CNI、CSI 和容器运行时；Kubernetes 每引入一个新原语，KubeRay 的行为边界就会移动一点。

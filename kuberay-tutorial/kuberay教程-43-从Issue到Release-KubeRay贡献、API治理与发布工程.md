@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 43 章 从 Issue 到 Release：KubeRay 贡献、API 治理与发布工程
 
 第 30 章教你怎么读源码，第 38 章教你怎么把 MiniKubeRay 移植成生产 operator。本章补上最后一环：**一个字段/功能从想法到发布，中间要经过哪些工程环节**。

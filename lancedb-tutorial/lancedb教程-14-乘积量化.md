@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 14 章　乘积量化
 
 上一章解决的是"要算多少距离"。这一章解决的是另一个正交的问题：

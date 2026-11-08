@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 C:术语表
 
 读 ClickHouse 的文档、报错和源码时,真正拖慢你的往往不是某个生词本身,而是几个**长得很像、意思却差很远**的词——`part` 与 `partition`、`主键` 与`排序键`、`replica` 与 `shard`、`ProfileEvents` 与 `CurrentMetrics`。这一份术语表按主题分组,每条给中文名、英文原文、一句话定义,并在最容易混的地方点明区别;每条末尾用"详见第 NN 章"指向正文里讲透它的地方。查的时候先按主题定位,再按英文名找行。

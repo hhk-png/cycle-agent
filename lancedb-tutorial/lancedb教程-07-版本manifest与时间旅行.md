@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 7 章　版本 manifest 与时间旅行
 
 如果只能从 Lance 的设计里保留一个思想，我会保留这个：

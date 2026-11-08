@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 47 章 LLM 推理内部机制：Continuous Batching、KV Cache、前缀缓存与 PD 分离
 
 第 28 章讲了“怎样在 KubeRay 上部署一个 LLM 服务”，重点是 `RayService`、`serveConfigV2`、GPU 规划和容量公式。本章再往下走一层：**同一个模型、同一张 GPU，为什么换一个调度策略吞吐能差 2–5 倍；为什么长 prompt 会把短请求的尾延迟拖垮；为什么 PD 分离在数据中心里值得多一跳网络**。

@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 28 章 安全、隐私与多租户
 
 本章导读：推理服务的安全问题不只是“防越狱”。它还包括特殊 token 注入、KV 缓存串租户、前缀哈希侧信道、结构化输出编译缓存 DoS、超长 prompt 耗尽显存、日志泄露、模型权重与供应链。本章给出一个推理服务的威胁模型、控制清单和分层架构，并指出 mini-deepinfer 在这些方面的缺口。

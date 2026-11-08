@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 9 章 结构化输出
 
 本章导读：结构化输出不是“生成完再解析”，而是在每个 decode step 用文法限制采样空间。本章讲清正则/JSON/EBNF 如何编译成自动机、如何变成 token mask、触发词和边界 token 怎么工作、推测解码下如何回滚，以及编译缓存的安全风险。最后给出 mini-deepinfer 的 NFA 实现。

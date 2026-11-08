@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 8 章 状态、条件、事件与可观测性
 
 Ray 集群出问题时，最常见的情况不是“完全没日志”，而是“有太多日志但不知道看哪”。本章把可观测性拆成五层：status、conditions、events、logs、metrics，再加上 Ray Dashboard 和 History Server。

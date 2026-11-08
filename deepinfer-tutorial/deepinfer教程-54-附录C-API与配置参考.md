@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 C API 与配置参考
 
 本附录给出 mini-deepinfer 的公开 API、配置项、命令行、HTTP 端点和性能模型接口。DeepInfer 的真实配置项更多，且随版本变化；请以官方仓库的 `EngineArgs` 和 README 为准。

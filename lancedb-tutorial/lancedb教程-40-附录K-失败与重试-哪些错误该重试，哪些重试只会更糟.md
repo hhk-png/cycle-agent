@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 附录 K　失败与重试：哪些错误该重试，哪些重试只会更糟
 
 ## K.1 这一篇补的是哪一层

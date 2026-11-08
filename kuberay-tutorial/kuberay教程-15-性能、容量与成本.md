@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 15 章 性能、容量与成本
 
 Ray 集群的性能问题经常被误判为“KubeRay 慢”，实际根因可能在对象存储、镜像拉取、GPU 利用率、调度错配或 Serve 副本。本章给出一套从 Pod 到 Ray 再到成本的排查框架。

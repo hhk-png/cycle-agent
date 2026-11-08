@@ -1,3 +1,5 @@
+**仓库、博客地址：[https://github.com/hhk-png/cycle-agent](https://github.com/hhk-png/cycle-agent)**
+
 # 第 44 章 多可用区、托管 Kubernetes 与灾难恢复
 
 前 43 章默认了一个隐含前提：集群的控制面、节点、存储和网络都在同一个故障域里。生产环境很少这么简单。RayCluster 可能跨三个可用区，head 和 GPU worker 分属不同节点池，对象存储和镜像仓库在集群外，operator 自己也需要高可用。本章把这些约束放在一起，回答三个问题：
