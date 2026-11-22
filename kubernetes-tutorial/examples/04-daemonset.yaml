@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+    spec:
+      containers:
+        - name: agent
+          image: node-agent:1.0
+          ports:
+            - containerPort: 9100
+          resources:
+            requests:
+              cpu: 20m
+              memory: 24Mi
+          readinessProbe:
+            tcpSocket:
+              port: 9100
+            periodSeconds: 1
+            failureThreshold: 2

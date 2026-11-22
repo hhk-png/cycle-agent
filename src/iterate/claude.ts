@@ -27,7 +27,7 @@ function toolHint(json: string): string {
     const input = JSON.parse(json) as Record<string, unknown>;
     for (const key of TOOL_HINT_KEYS) {
       const value = input[key];
-      if (typeof value === 'string' && value) return ` ${value.replace(/\s+/g, ' ').slice(0, 70)}`;
+      if (typeof value === 'string' && value) return ` ${value.replace(/\s+/g, ' ')}`;
     }
   } catch {}
   return '';

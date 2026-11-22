@@ -1,0 +1,11 @@
+.venv/
+.runtime/
+.wheels/
+.bootstrap/
+.cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+checkpoints/
+.verify_tmp/
+*.jsonl

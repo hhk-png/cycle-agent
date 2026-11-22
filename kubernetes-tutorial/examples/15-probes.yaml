@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probed
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: probed
+  template:
+    metadata:
+      labels:
+        app: probed
+      annotations:
+        mini-k8s.io/simulate.ready-after-ticks: "2"
+    spec:
+      containers:
+        - name: app
+          image: demo/probed:1.0
+          ports:
+            - containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 1
+            failureThreshold: 2
+          livenessProbe:
+            exec:
+              command: ["cat", "/tmp/healthy"]
+            periodSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probed
+  namespace: default
+spec:
+  selector:
+    app: probed
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

@@ -1,0 +1,39 @@
+# Reward-model training on the contextual-bandit teaching task.
+#
+# The same file can be used by PPO after training: point
+# reward.reward_model.enable/model_path at the saved checkpoint.
+data:
+  dataset: bandit
+  train_size: 128
+  val_size: 32
+  train_batch_size: 16
+  max_prompt_length: 16
+  max_response_length: 8
+  shuffle: true
+  seed: 0
+
+reward:
+  reward_model:
+    enable: true
+    arch: mlp
+    hidden_size: 32
+    pooling: mean
+    lr: 0.02
+    weight_decay: 0.0
+    clip_grad: 1.0
+    train_batch_size: 16
+    total_steps: 160
+    eval_freq: 20
+    margin: 0.0
+    label_smoothing: 0.0
+    length_normalize: 0.0
+    target_accuracy: 0.98
+    patience: 4
+    save: true
+    output_dir: outputs/reward_model/bandit
+
+trainer:
+  seed: 1
+  log_dir: outputs
+  experiment_name: bandit_rm
+  total_training_steps: 160

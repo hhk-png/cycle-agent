@@ -1,0 +1,40 @@
+data:
+  dataset: bandit
+  train_size: 64
+  val_size: 32
+  train_batch_size: 16
+  max_prompt_length: 4
+  max_response_length: 2
+
+actor_rollout_ref:
+  model:
+    arch: linear
+    hidden_size: 32
+    max_seq_len: 32
+  actor:
+    ppo_mini_batch_size: 64
+    ppo_micro_batch_size: 64
+    clip_ratio_low: 0.2
+    clip_ratio_high: 0.28
+    loss_agg_mode: token-mean
+  rollout:
+    n: 8
+    allowed_chars: xyzw
+
+algorithm:
+  adv_estimator: dapo
+  filter_groups:
+    enable: true
+    metric: reward
+  overlong_penalty_factor: 0.5
+
+reward:
+  reward_manager: dapo
+  reward_fn: bandit
+
+trainer:
+  total_training_steps: 20
+  val_before_train: false
+  logger: [console]
+  n_gpus_per_node: 1
+  nnodes: 1

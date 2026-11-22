@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: constrained
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: constrained
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 64Mi
+      max:
+        cpu: "2"
+        memory: 1Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+  namespace: constrained
+spec:
+  hard:
+    pods: "3"
+    requests.cpu: 600m
+    requests.memory: 512Mi
+    count/deployments.apps: "2"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo
+  namespace: constrained
+spec:
+  containers:
+    - name: app
+      image: demo/quota-app:1.0

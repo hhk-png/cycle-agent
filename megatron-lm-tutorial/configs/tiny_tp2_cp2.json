@@ -1,0 +1,33 @@
+{
+  "model": {
+    "vocab_size": 128,
+    "max_seq_len": 64,
+    "hidden_size": 64,
+    "num_layers": 2,
+    "num_attention_heads": 4,
+    "num_query_groups": 4,
+    "ffn_hidden_size": 128,
+    "activation": "swiglu",
+    "position_embedding": "rope"
+  },
+  "parallel": {
+    "tensor_model_parallel_size": 2,
+    "pipeline_model_parallel_size": 1,
+    "context_parallel_size": 2,
+    "sequence_parallel": false,
+    "distributed_optimizer": false,
+    "pipeline_schedule": "1f1b"
+  },
+  "train": {
+    "micro_batch_size": 2,
+    "global_batch_size": 4,
+    "seq_len": 32,
+    "max_steps": 2,
+    "lr": 0.0003,
+    "warmup_steps": 1,
+    "checkpoint_dir": "checkpoints/tiny_tp2_cp2",
+    "device": "cpu",
+    "data": "synthetic",
+    "seed": 1234
+  }
+}

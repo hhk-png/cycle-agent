@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-etl
+  namespace: default
+spec:
+  completions: 3
+  parallelism: 2
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        job: batch-etl
+      annotations:
+        mini-k8s.io/simulate.run-ticks: "2"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: etl
+          image: etl:2.1
+          command: ["python", "-m", "etl"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-report
+  namespace: default
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            job: nightly-report
+          annotations:
+            mini-k8s.io/simulate.run-ticks: "2"
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: report
+              image: report:1.0
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi

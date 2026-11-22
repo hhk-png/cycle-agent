@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quorum
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: quorum
+  template:
+    metadata:
+      labels:
+        app: quorum
+    spec:
+      containers:
+        - name: app
+          image: demo/quorum:1.0
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quorum
+  namespace: default
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: quorum

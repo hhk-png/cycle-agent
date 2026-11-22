@@ -1,0 +1,47 @@
+# Process-reward-model training on the single-token contextual bandit.
+#
+# This is the PRM used by the PPO integration in examples/26_process_reward.py:
+# the response is "action + EOS", so step_tokens=1 yields two steps.  The
+# "copy" config (prm_copy.yaml) is better for demonstrating multi-step
+# aggregation because its gold answer has two characters.
+#
+# Train:
+#   python -X utf8 -m mini_verl.trainer.main_prm configs/prm_bandit.yaml
+# Then serve it from PPO:
+#   reward.prm.enable=true reward.prm.model_path=outputs/prm/bandit
+data:
+  dataset: bandit
+  train_size: 128
+  val_size: 32
+  train_batch_size: 32
+  max_prompt_length: 8
+  max_response_length: 4
+  shuffle: true
+  seed: 0
+
+reward:
+  prm:
+    enable: true
+    arch: mlp
+    hidden_size: 32
+    pooling: mean
+    step_tokens: 1
+    label_mode: suffix
+    corruptions_per_sample: 4
+    aggregation: min
+    lr: 0.02
+    weight_decay: 0.0
+    clip_grad: 1.0
+    train_batch_size: 32
+    total_steps: 60
+    eval_freq: 20
+    target_accuracy: 0.95
+    patience: 4
+    save: true
+    output_dir: outputs/prm/bandit
+
+trainer:
+  seed: 1
+  log_dir: outputs
+  experiment_name: bandit_prm
+  total_training_steps: 60

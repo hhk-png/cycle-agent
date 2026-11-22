@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-verl"
+version = "0.9.1.mini.1"
+description = "A runnable NumPy miniature of verl's HybridFlow RL system"
+requires-python = ">=3.10"
+dependencies = ["numpy>=2.0", "PyYAML>=6.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

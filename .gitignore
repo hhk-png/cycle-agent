@@ -16,3 +16,7 @@ __pycache__
 
 # Iteration logs — have contained API keys, must never be committed
 result.md
+.cache
+.runtime
+.bootstrap
+.venv

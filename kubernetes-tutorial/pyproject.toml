@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-k8s"
+version = "0.9.0"
+description = "A runnable, pedagogical Kubernetes implementation and tutorial"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+mk8s = "mini_k8s.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["mini_k8s*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

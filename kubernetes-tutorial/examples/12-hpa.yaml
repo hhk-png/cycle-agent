@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-app
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cpu-app
+  template:
+    metadata:
+      labels:
+        app: cpu-app
+      annotations:
+        mini-k8s.io/simulate.cpu-usage: 100m
+    spec:
+      containers:
+        - name: app
+          image: demo/cpu-app:1.0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cpu-app
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cpu-app
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

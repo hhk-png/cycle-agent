@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-megatron"
+version = "0.4.4"
+description = "A runnable, pedagogical reconstruction of Megatron-LM core ideas"
+requires-python = ">=3.12"
+dependencies = ["torch>=2.9.1", "numpy>=2.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["mini_megatron*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+markers = [
+  "slow: multi-process or long-running test",
+]

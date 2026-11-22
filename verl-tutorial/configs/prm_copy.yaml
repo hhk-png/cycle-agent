@@ -1,0 +1,53 @@
+# Process-reward-model training on the multi-step "copy" task.
+#
+# The gold answer has two content characters plus EOS, so step_tokens=1
+# yields three steps:
+#   prompt "ax=" -> step 1 "a" -> step 2 "x" -> step 3 EOS
+# Each sample gets several corrupted trajectories.  With label_mode=local only
+# the corrupted step is negative; with suffix the error propagates.  The
+# suffix + multiple-corruption setup is what keeps the PRM from being fooled
+# by locally-correct later steps.
+#
+# Train:
+#   python -X utf8 -m mini_verl.trainer.main_prm configs/prm_copy.yaml
+#
+# This checkpoint is for step-score/aggregation diagnostics (see
+# examples/26_process_reward.py).  For PPO integration use prm_bandit.yaml:
+# the tiny policy's action space is the single-token bandit, while the copy
+# task is used to demonstrate multi-step PRM scoring.
+data:
+  dataset: copy
+  train_size: 128
+  val_size: 32
+  train_batch_size: 32
+  max_prompt_length: 16
+  max_response_length: 4
+  shuffle: true
+  seed: 0
+
+reward:
+  prm:
+    enable: true
+    arch: mlp
+    hidden_size: 32
+    pooling: mean
+    step_tokens: 1
+    label_mode: suffix
+    corruptions_per_sample: 8
+    aggregation: min
+    lr: 0.02
+    weight_decay: 0.0
+    clip_grad: 1.0
+    train_batch_size: 32
+    total_steps: 100
+    eval_freq: 20
+    target_accuracy: 0.96
+    patience: 4
+    save: true
+    output_dir: outputs/prm/copy
+
+trainer:
+  seed: 1
+  log_dir: outputs
+  experiment_name: copy_prm
+  total_training_steps: 100

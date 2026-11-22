@@ -1,0 +1,92 @@
+# Gateway API: GatewayClass -> Gateway -> HTTPRoute -> Service.
+# MiniK8s implements the status contract and an in-process L7 route table.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: mini
+spec:
+  controllerName: mini-k8s.io/gateway-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: edge
+  namespace: default
+spec:
+  gatewayClassName: mini
+  listeners:
+    - name: http
+      hostname: shop.example.com
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop
+  template:
+    metadata:
+      labels:
+        app: shop
+    spec:
+      containers:
+        - name: web
+          image: shop:1.0
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop
+  namespace: default
+spec:
+  selector:
+    app: shop
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shop
+  namespace: default
+spec:
+  parentRefs:
+    - name: edge
+  hostnames:
+    - shop.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: shop
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: shop
+          port: 80
