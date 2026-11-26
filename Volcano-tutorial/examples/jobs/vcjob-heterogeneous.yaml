@@ -1,0 +1,31 @@
+# 异构 GPU：用 nodeSelector 选择 A100；GPU Operator 通常会给节点打上
+# nvidia.com/gpu.product 标签（具体值以集群为准）。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: a100-train
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  minAvailable: 2
+  maxRetry: 2
+  tasks:
+    - name: worker
+      replicas: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-A100-SXM4-80GB
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "nvidia-smi; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: 16Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"

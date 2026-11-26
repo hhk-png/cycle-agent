@@ -1,0 +1,28 @@
+# 网络拓扑感知：多个 predicates/score 插件分层组合。HyperNode CR 必须先创建。
+# tier 数字越小域越近；highestTierAllowed=2 表示允许跨到第 2 层域。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, preempt, reclaim"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: proportion
+      - name: network-topology-aware
+      - name: nodeorder
+      - name: binpack
+        arguments:
+          binpack.weight: "2"

@@ -1,0 +1,18 @@
+# v1.15+ 的 DRA 队列配额：capacity 插件的 capability 可以直接限制 DeviceClass。
+# 需要 Kubernetes DRA、可用的 DRA driver，以及在 scheduler config 中开启
+# capacity.DynamicResourceAllocationEnable=true。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: dra-team
+spec:
+  weight: 1
+  reclaimable: true
+  capability:
+    cpu: "32"
+    memory: 128Gi
+    "deviceclass/gpu.nvidia.com": "8"
+  deserved:
+    "deviceclass/gpu.nvidia.com": "4"
+  guarantee:
+    "deviceclass/gpu.nvidia.com": "2"

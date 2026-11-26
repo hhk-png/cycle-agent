@@ -1,0 +1,75 @@
+# PyTorch 分布式作业：pytorch 作业插件注入 MASTER_ADDR/RANK/WORLD_SIZE，
+# svc 创建 headless Service，ssh 生成免密登录 Secret。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: pytorch-dist
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  priorityClassName: high-priority
+  minAvailable: 3
+  maxRetry: 3
+  plugins:
+    ssh: []
+    svc: []
+    pytorch: ["--master=master", "--worker=worker"]
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+  tasks:
+    - name: master
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            role: master
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pytorch
+              image: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+              command:
+                - python
+                - -c
+                - |
+                  import os, time
+                  print("rank", os.environ.get("RANK"),
+                        "master", os.environ.get("MASTER_ADDR"),
+                        "world", os.environ.get("WORLD_SIZE"))
+                  time.sleep(3600)
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"
+    - name: worker
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pytorch
+              image: pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+              command:
+                - python
+                - -c
+                - |
+                  import os, time
+                  print("rank", os.environ.get("RANK"),
+                        "master", os.environ.get("MASTER_ADDR"),
+                        "world", os.environ.get("WORLD_SIZE"))
+                  time.sleep(3600)
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"

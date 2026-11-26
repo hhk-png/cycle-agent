@@ -1,0 +1,30 @@
+# 网络拓扑硬约束：8 个 worker 必须落在同一个 tier<=2 的 HyperNode 内。
+# 需要先创建 HyperNode CR，并在 scheduler config 中启用 network-topology-aware。
+# 副本数必须不超过目标域的实际空闲容量；这里 8 卡需要 4 台 2 卡节点或等效容量。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: topology-train
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  minAvailable: 8
+  networkTopology:
+    mode: hard
+    highestTierAllowed: 2
+  tasks:
+    - name: worker
+      replicas: 8
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo topology; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                  nvidia.com/gpu: "1"

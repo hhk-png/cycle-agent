@@ -1,0 +1,43 @@
+# Ray 原生作业（v1.13+）：ray 作业插件自动拼装 head/worker 的启动参数。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: ray-cluster
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  minAvailable: 3
+  maxRetry: 2
+  plugins:
+    svc: []
+    ray: []
+  tasks:
+    - name: head
+      replicas: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ray
+              image: rayproject/ray:2.40.0-gpu
+              command: ["bash", "-c", "ray start --head --dashboard-host=0.0.0.0; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                  nvidia.com/gpu: "1"
+    - name: worker
+      replicas: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ray
+              image: rayproject/ray:2.40.0-gpu
+              command: ["bash", "-c", "sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                  nvidia.com/gpu: "1"

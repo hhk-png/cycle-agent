@@ -1,0 +1,36 @@
+# minSuccess 是“至少 N 个副本成功即可完成”的独立门槛，不是 minAvailable
+# 的替代。这里 4 个分片、gang 只要 2 个、成功 2 个就提前 Completed；
+# 其余尚未启动的副本会被终止，不会继续占队列配额。
+#
+# 风险：minSuccess < minAvailable 时，可能在 gang 尚未完整时就提前完成；
+# 本示例让两者相等，表示“两个分片成功就算这份数据切分处理完”。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: min-success
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 2
+  minSuccess: 2
+  maxRetry: 3
+  ttlSecondsAfterFinished: 600
+  tasks:
+    - name: shard
+      replicas: 4
+      minAvailable: 2
+      template:
+        metadata:
+          labels:
+            app: min-success
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: shard
+              image: busybox:1.36
+              command: ["sh", "-c", "echo shard; sleep 60"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 1Gi

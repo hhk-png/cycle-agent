@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-mlflow-tutorial"
+version = "1.0.0"
+description = "A from-scratch, runnable MiniMLflow implementation used by the MLflow tutorial"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "MLflow Tutorial" }]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+mini-mlflow = "mini_mlflow.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mini_mlflow*"]
+
+[tool.setuptools.package-data]
+"mini_mlflow.store" = ["*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --basetemp=.pytest-tmp"
+filterwarnings = ["error::DeprecationWarning:mini_mlflow.*"]

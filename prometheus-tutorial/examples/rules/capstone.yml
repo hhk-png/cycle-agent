@@ -1,0 +1,22 @@
+groups:
+  - name: capstone
+    interval: 5s
+    rules:
+      - record: job:demo_requests:rate1m
+        expr: sum by (job) (rate(demo_http_requests_total[1m]))
+
+      - record: job:demo_request_errors:ratio1m
+        expr: |
+          sum by (job) (rate(demo_http_requests_total{code=~"5.."}[1m]))
+          /
+          sum by (job) (rate(demo_http_requests_total[1m]))
+
+      - alert: DemoCheckoutAvailabilityBurn
+        expr: job:demo_request_errors:ratio1m{job="demo"} > 0.2
+        for: 10s
+        labels:
+          severity: page
+          slo: checkout-availability
+        annotations:
+          summary: "demo checkout 5xx ratio is {{ $value }}"
+          runbook_url: "https://runbooks.example/demo-checkout"

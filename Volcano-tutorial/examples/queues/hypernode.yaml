@@ -1,0 +1,58 @@
+# HyperNode 拓扑树示例：tier 越小表示域越近（叶子 tier1、机架 tier2、集群 tier3）。
+# 叶子 HyperNode 用 type: Node 精确匹配节点名；父节点用 type: HyperNode 引用子树。
+# 节点名请替换成真实集群节点；一个叶子可以包含多个节点。
+apiVersion: topology.volcano.sh/v1alpha1
+kind: HyperNode
+metadata:
+  name: leaf-a1
+spec:
+  tier: 1
+  tierName: tor
+  members:
+    - type: Node
+      selector:
+        exactMatch:
+          name: node-a1
+---
+apiVersion: topology.volcano.sh/v1alpha1
+kind: HyperNode
+metadata:
+  name: leaf-a2
+spec:
+  tier: 1
+  tierName: tor
+  members:
+    - type: Node
+      selector:
+        exactMatch:
+          name: node-a2
+---
+apiVersion: topology.volcano.sh/v1alpha1
+kind: HyperNode
+metadata:
+  name: rack-a
+spec:
+  tier: 2
+  tierName: rack
+  members:
+    - type: HyperNode
+      selector:
+        exactMatch:
+          name: leaf-a1
+    - type: HyperNode
+      selector:
+        exactMatch:
+          name: leaf-a2
+---
+apiVersion: topology.volcano.sh/v1alpha1
+kind: HyperNode
+metadata:
+  name: root
+spec:
+  tier: 3
+  tierName: cluster
+  members:
+    - type: HyperNode
+      selector:
+        exactMatch:
+          name: rack-a

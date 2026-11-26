@@ -1,0 +1,46 @@
+# NamespaceQueue (v1.16 Alpha) requires:
+#   helm --set custom.namespace_queue_enable=true
+#   capacity plugin with enableHierarchy: true (plugin option, not arguments)
+# The cluster Queue authorizes team-a; the tenant owns the subtree below it.
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: research
+spec:
+  weight: 1
+  capability:
+    cpu: "256"
+    nvidia.com/gpu: "64"
+  allowedNamespaces:
+    - team-a
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: NamespaceQueue
+metadata:
+  name: training
+  namespace: team-a
+spec:
+  parent: cluster/research
+  capability:
+    cpu: "100"
+    nvidia.com/gpu: "32"
+  deserved:
+    cpu: "80"
+    nvidia.com/gpu: "24"
+  guarantee:
+    cpu: "40"
+    nvidia.com/gpu: "8"
+  reclaimable: true
+  priority: 10
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: NamespaceQueue
+metadata:
+  name: inference
+  namespace: team-a
+spec:
+  parent: training
+  capability:
+    cpu: "40"
+    nvidia.com/gpu: "8"
+  reclaimable: true

@@ -1,0 +1,14 @@
+groups:
+  - name: demo
+    interval: 15s
+    rules:
+      - record: job:demo_requests:rate5m
+        expr: sum by (job) (rate(demo_http_requests_total[5m]))
+
+      - alert: DemoTargetDown
+        expr: up{job="demo"} == 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.instance }} is down"

@@ -1,0 +1,33 @@
+# Example gateway configuration for:
+#   python -m mini_mlflow gateway validate --config examples/gateway.yaml
+#   python -m mini_mlflow server --gateway-config examples/gateway.yaml
+#
+# Providers are mock by default so the example runs offline. A real provider
+# would use kind: callable and be registered in code with CallableProvider;
+# configuration stores the *name* of the environment variable, never the key.
+providers:
+  mock-fast:
+    kind: mock
+    model: mock-small
+    cost_per_1k_input: 0.15
+    cost_per_1k_output: 0.60
+    timeout_ms: 5000
+    max_output_tokens: 512
+  mock-strong:
+    kind: mock
+    model: mock-large
+    cost_per_1k_input: 3.00
+    cost_per_1k_output: 15.00
+    timeout_ms: 30000
+    max_output_tokens: 2048
+
+routes:
+  support:
+    primary: mock-fast
+    fallbacks: [mock-strong]
+    rate_limit_rpm: 120
+    cache_ttl_s: 30
+  summarization:
+    primary: mock-strong
+    rate_limit_rpm: 30
+    cache_ttl_s: 0

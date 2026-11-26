@@ -1,0 +1,26 @@
+{
+  "actions": ["enqueue", "allocate", "preempt", "reclaim", "backfill"],
+  "tiers": [
+    {
+      "name": "tier-1",
+      "plugins": [
+        {"name": "priority"},
+        {"name": "gang", "args": {"enablePreemptable": "true", "enableJobStarving": "true"}},
+        {"name": "pdb"},
+        {"name": "conformance"}
+      ]
+    },
+    {
+      "name": "tier-2",
+      "plugins": [
+        {"name": "drf"},
+        {"name": "predicates"},
+        {"name": "proportion", "args": {"enablePreemptable": "true"}},
+        {"name": "nodeorder"},
+        {"name": "binpack", "args": {"weight": "1"}},
+        {"name": "resourcequota"},
+        {"name": "nodegroup"}
+      ]
+    }
+  ]
+}

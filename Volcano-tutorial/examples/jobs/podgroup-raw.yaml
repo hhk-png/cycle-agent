@@ -1,0 +1,39 @@
+# 非 Volcano Job 的工作负载（Deployment/StatefulSet/裸 Pod）通过 PodGroup +
+# scheduling.k8s.io/group-name 注解获得 gang 调度。Pod 必须使用 schedulerName: volcano。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: PodGroup
+metadata:
+  name: web-gang
+  namespace: default
+spec:
+  minMember: 3
+  minResources:
+    cpu: "3"
+    memory: 6Gi
+  queue: team-b
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+      annotations:
+        scheduling.k8s.io/group-name: web-gang
+    spec:
+      schedulerName: volcano
+      containers:
+        - name: web
+          image: nginx:1.27
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi

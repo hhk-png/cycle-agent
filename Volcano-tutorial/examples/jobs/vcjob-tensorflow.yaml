@@ -1,0 +1,42 @@
+# TensorFlow 作业：tensorflow 插件为 ps/worker/chief 注入 TF_CONFIG。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: tf-dist
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 3
+  maxRetry: 2
+  plugins:
+    svc: []
+    tensorflow: []
+  tasks:
+    - name: ps
+      replicas: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: tensorflow
+              image: tensorflow/tensorflow:2.16.1-gpu
+              command: ["python", "-c", "import os,time; print(os.environ.get('TF_CONFIG')); time.sleep(3600)"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+    - name: worker
+      replicas: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: tensorflow
+              image: tensorflow/tensorflow:2.16.1-gpu
+              command: ["python", "-c", "import os,time; print(os.environ.get('TF_CONFIG')); time.sleep(3600)"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 8Gi
+                  nvidia.com/gpu: "1"

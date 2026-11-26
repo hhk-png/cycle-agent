@@ -1,0 +1,17 @@
+rule_files:
+  - capstone.yml
+evaluation_interval: 5s
+tests:
+  - name: capstone error ratio is computed
+    interval: 5s
+    input_series:
+      - series: 'demo_http_requests_total{job="demo",code="200"}'
+        values: '0+100x20'
+      - series: 'demo_http_requests_total{job="demo",code="500"}'
+        values: '0+10x20'
+    promql_expr_test:
+      - expr: job:demo_request_errors:ratio1m
+        eval_time: 1m
+        exp_samples:
+          - labels: 'job:demo_request_errors:ratio1m{job="demo"}'
+            value: 0.09090909090909091

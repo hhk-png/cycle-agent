@@ -1,0 +1,28 @@
+# Volcano 默认形态的完整调度流水线：proportion 做加权公平，preempt/reclaim
+# 处理队列内抢占与跨队列回收。修改后需要重启 volcano-scheduler 生效。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, preempt, reclaim"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: proportion
+        enablePreemptable: true
+      - name: nodeorder
+      - name: binpack
+        arguments:
+          binpack.weight: "1"

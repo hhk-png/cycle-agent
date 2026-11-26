@@ -1,0 +1,51 @@
+# 队列 × 节点组：affinity 决定“能落在哪些池”，
+# volcano.sh/nodegroup-resource-limits 注解决定“每个池最多用多少”。
+#
+# 节点侧需要先打标签：
+#   kubectl label node <name> volcano.sh/nodegroup-name=a100
+#
+# training 没有 required affinity，只有 preferred，因此 a100/h100 都可落；
+# 默认所有 preferred 组同分；要让 a100 优先，需给 nodegroup 插件配
+# arguments.enablePreferredOrder: "true"。
+# arm 是硬反亲和，任何情况下都不会落。
+#
+# strict 默认 true：所有节点都必须带 volcano.sh/nodegroup-name 标签并满足 affinity。
+# 本文件两个队列都声明了 affinity，strict: false 也不会放行未打标签的节点；
+# 只有“队列没有 affinity”时，strict: false 才放行未打标签节点。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: training
+  annotations:
+    volcano.sh/nodegroup-resource-limits: |
+      {"a100": {"nvidia.com/gpu": "32", "cpu": "128"},
+       "h100": {"nvidia.com/gpu": "16"}}
+spec:
+  weight: 3
+  capability:
+    nvidia.com/gpu: "64"
+  guarantee:
+    nvidia.com/gpu: "8"
+  affinity:
+    nodeGroupAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - a100
+        - h100
+    nodeGroupAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - arm
+---
+# inference 只允许 h100：required 是硬约束，
+# 即使 a100 空闲，副本也不会落过去。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: inference
+spec:
+  weight: 2
+  capability:
+    nvidia.com/gpu: "16"
+  affinity:
+    nodeGroupAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - h100

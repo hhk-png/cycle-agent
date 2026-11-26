@@ -1,0 +1,17 @@
+[project]
+name = "mini-rabbitmq-tutorial"
+version = "0.1.0"
+description = "A readable AMQP 0-9-1 broker and the RabbitMQ engineering tutorial"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "RabbitMQ tutorial contributors" }]
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

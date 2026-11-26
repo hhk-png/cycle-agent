@@ -1,0 +1,29 @@
+# 层级队列：capacity 与 proportion 互斥，开启 enableHierarchy 后父队列的
+# capability/deserved 会被子队列按 weight 分享。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, preempt, reclaim"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: capacity
+        enableHierarchy: true
+        enablePreemptable: true
+      - name: nodeorder
+      - name: binpack
+        arguments:
+          binpack.weight: "1"

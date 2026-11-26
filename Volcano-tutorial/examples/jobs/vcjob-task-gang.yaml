@@ -1,0 +1,61 @@
+# 任务级 gang：job.minAvailable=5，恰好等于
+#   master.minAvailable(1) + worker.minAvailable(4)
+# 因此控制器会把两个角色写进 PodGroup.spec.minTaskMember，
+# gang 插件会同时检查“总数 ≥ 5”和“master ≥ 1、worker ≥ 4”。
+#
+# 注意：这里刻意不使用 task 级 dependsOn。dependsOn 会让下游 Pod 在
+# 上游 Ready 前不创建，而 gang 的 JobValid 又要求 minAvailable 个有效 Pod；
+# 两者叠加会死锁。dependsOn 的用法见第 4.2.4 节（配 minAvailable=1 或关闭 gang）。
+#
+# 若把 job.minAvailable 改成 4（小于 1+4），角色门槛会被跳过，
+# 可能出现 1 个 master + 3 个 worker 就判定 gang 满足——这是 API 的真实行为。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: task-gang
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 5
+  maxRetry: 3
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+  tasks:
+    - name: master
+      replicas: 1
+      minAvailable: 1
+      template:
+        metadata:
+          labels:
+            role: master
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: master
+              image: busybox:1.36
+              command: ["sh", "-c", "echo master; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                  nvidia.com/gpu: "1"
+    - name: worker
+      replicas: 8
+      minAvailable: 4
+      template:
+        metadata:
+          labels:
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo worker; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                  nvidia.com/gpu: "1"

@@ -1,0 +1,30 @@
+# TDM（时分复用）：带 volcano.sh/preemptable=true 的作业只能进入带
+# volcano.sh/revocable-zone 标签、且处于配置时间窗内的节点。
+# 时间窗由 scheduler config 的 tdm 插件参数给出，例如：
+#   tdm.revocable-zone.rz1: "1:00-4:00"
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: tdm-batch
+  namespace: default
+  annotations:
+    volcano.sh/preemptable: "true"
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 4
+  maxRetry: 2
+  tasks:
+    - name: worker
+      replicas: 4
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo tdm; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi

@@ -1,0 +1,135 @@
+# 8 卡全参微调：4 个 Pod × 2 GPU，minAvailable=4。
+# 微调允许被抢占，但 checkpoint 间隔要短；PodEvicted 后整体重启，从最近 checkpoint 恢复。
+# LoRA/QLoRA 可以退化成单 Pod、minAvailable=1，甚至不用 Volcano Job。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: llm-finetune-8
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: llm-finetune
+  priorityClassName: high-priority
+  minAvailable: 4
+  maxRetry: 3
+  ttlSecondsAfterFinished: 86400
+  plugins:
+    ssh: []
+    svc: []
+    pytorch: ["--master=master", "--worker=worker"]
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+    - event: PodFailed
+      action: RestartJob
+  tasks:
+    - name: master
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: llm-finetune
+            role: master
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          containers:
+            - name: trainer
+              image: nvcr.io/nvidia/pytorch:24.10-py3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  torchrun \
+                    --nnodes=4 \
+                    --nproc_per_node=2 \
+                    --node_rank=${RANK} \
+                    --master_addr=${MASTER_ADDR} \
+                    --master_port=29500 \
+                    train_sft.py \
+                    --model /models/llama-3-8b \
+                    --checkpoint-dir /checkpoints/sft \
+                    --save-steps 200
+              resources:
+                requests:
+                  cpu: "16"
+                  memory: 128Gi
+                  nvidia.com/gpu: "2"
+                limits:
+                  nvidia.com/gpu: "2"
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: checkpoints
+                  mountPath: /checkpoints
+                - name: models
+                  mountPath: /models
+                  readOnly: true
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 16Gi
+            - name: checkpoints
+              persistentVolumeClaim:
+                claimName: llm-checkpoints
+            - name: models
+              persistentVolumeClaim:
+                claimName: llm-models
+    - name: worker
+      replicas: 3
+      template:
+        metadata:
+          labels:
+            app: llm-finetune
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          containers:
+            - name: trainer
+              image: nvcr.io/nvidia/pytorch:24.10-py3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  torchrun \
+                    --nnodes=4 \
+                    --nproc_per_node=2 \
+                    --node_rank=${RANK} \
+                    --master_addr=${MASTER_ADDR} \
+                    --master_port=29500 \
+                    train_sft.py \
+                    --model /models/llama-3-8b \
+                    --checkpoint-dir /checkpoints/sft \
+                    --save-steps 200
+              resources:
+                requests:
+                  cpu: "16"
+                  memory: 128Gi
+                  nvidia.com/gpu: "2"
+                limits:
+                  nvidia.com/gpu: "2"
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: checkpoints
+                  mountPath: /checkpoints
+                - name: models
+                  mountPath: /models
+                  readOnly: true
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 16Gi
+            - name: checkpoints
+              persistentVolumeClaim:
+                claimName: llm-checkpoints
+            - name: models
+              persistentVolumeClaim:
+                claimName: llm-models

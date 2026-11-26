@@ -1,0 +1,123 @@
+# 多机 vLLM serving 组：leader + worker 两个 Pod，minAvailable=2 表示整组一起启动。
+# PDB minAvailable=1 保护“至少一个副本可用”，同时允许一次自愿中断。
+# 生产上多机 serving 更常用 LWS；这里用 Volcano Job 演示 gang + PDB + 队列的写法。
+# 命令是占位：真实的 vLLM 多机启动方式随版本变化，leader/worker 的 rank 参数由启动脚本注入。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: vllm-serving
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: llm-infer
+  priorityClassName: high-priority
+  minAvailable: 2
+  maxRetry: 5
+  plugins:
+    svc: []
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+    - event: PodFailed
+      action: RestartJob
+  tasks:
+    - name: leader
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: vllm-serving
+            role: leader
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          containers:
+            - name: vllm
+              image: vllm/vllm-openai:v0.7.3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  # 占位：多机 vLLM 需要 leader/worker 的分布式启动参数。
+                  vllm serve meta-llama/Llama-3.1-8B-Instruct \
+                    --tensor-parallel-size 2 \
+                    --host 0.0.0.0 \
+                    --port 8000
+              ports:
+                - name: http
+                  containerPort: 8000
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: http
+                initialDelaySeconds: 30
+                periodSeconds: 10
+              startupProbe:
+                httpGet:
+                  path: /health
+                  port: http
+                failureThreshold: 60
+                periodSeconds: 10
+              resources:
+                requests:
+                  cpu: "16"
+                  memory: 64Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /root/.cache/huggingface
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim:
+                claimName: llm-model-cache
+    - name: worker
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: vllm-serving
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          containers:
+            - name: vllm
+              image: vllm/vllm-openai:v0.7.3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  # 占位：worker 的启动参数由 leader/框架注入。
+                  sleep infinity
+              resources:
+                requests:
+                  cpu: "16"
+                  memory: 64Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /root/.cache/huggingface
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim:
+                claimName: llm-model-cache
+---
+# 注意：Volcano 的 pdb 插件必须启用，否则这个 PDB 只对 kubectl drain/Eviction API 生效。
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vllm-serving-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: vllm-serving

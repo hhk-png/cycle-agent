@@ -1,0 +1,19 @@
+# preemptionPolicy: Never 的类可以“不被抢占”以外的语义仍需配合 priority 插件；
+# 要把 Never 的类作为抢占者时，Volcano 会记录 not eligible due to preemptionPolicy=Never。
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Latency-critical or deadline-bound training jobs"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+value: 100
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Best-effort batch experiments"

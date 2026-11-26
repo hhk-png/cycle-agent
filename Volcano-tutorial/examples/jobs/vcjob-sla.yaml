@@ -1,0 +1,30 @@
+# SLA：等待超过预算的作业会被 sla 插件 pipeline/提权，避免长期饥饿。
+# 值使用 Go duration 语法；未标注的作业使用插件全局 sla-waiting-time。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: deadline-job
+  namespace: default
+  annotations:
+    volcano.sh/sla-waiting-time: "1h"
+spec:
+  schedulerName: volcano
+  queue: team-a
+  priorityClassName: high-priority
+  minAvailable: 4
+  maxRetry: 3
+  tasks:
+    - name: worker
+      replicas: 4
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo deadline; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi
+                  nvidia.com/gpu: "1"

@@ -1,0 +1,19 @@
+# Namespace ResourceQuota. Volcano's resourcequota plugin checks it during
+# enqueue, while the API Server enforces it when pods are created. Keeping both
+# layers is intentional: the plugin gives the scheduler an explainable rejection,
+# and the API Server remains the final guardrail.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-quota
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: team-quota
+  namespace: team-quota
+spec:
+  hard:
+    requests.cpu: "32"
+    requests.memory: 128Gi
+    requests.nvidia.com/gpu: "8"

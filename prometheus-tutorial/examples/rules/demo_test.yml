@@ -1,0 +1,43 @@
+rule_files:
+  - demo.yml
+evaluation_interval: 15s
+tests:
+  - name: demo error ratio fires
+    interval: 15s
+    input_series:
+      - series: 'demo_http_requests_total{job="demo",code="200"}'
+        values: '0+5x20'
+      - series: 'demo_http_requests_total{job="demo",code="500"}'
+        values: '0+5x20'
+    promql_expr_test:
+      - expr: job:demo_requests:rate5m
+        eval_time: 5m
+        exp_samples:
+          - labels: 'job:demo_requests:rate5m{job="demo"}'
+            value: 0.6666666666666666
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: DemoHighErrorRatio
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: demo
+            exp_annotations:
+              summary: "demo 5xx ratio is 0.5"
+              runbook_url: "https://example.invalid/runbooks/demo-errors"
+
+  - name: demo target down fires after one minute
+    interval: 15s
+    input_series:
+      - series: 'up{job="demo",instance="demo:9100"}'
+        values: '1 1 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: DemoTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: demo
+              instance: demo:9100
+            exp_annotations:
+              summary: "demo:9100 is down"

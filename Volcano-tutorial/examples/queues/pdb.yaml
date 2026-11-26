@@ -1,0 +1,13 @@
+# A PodDisruptionBudget for the inference workload. Volcano's pdb plugin
+# consults this object when filtering preempt/reclaim/shuffle victims; it is
+# inert unless the plugin is enabled in the scheduler config.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inference-pdb
+  namespace: team-a
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: inference

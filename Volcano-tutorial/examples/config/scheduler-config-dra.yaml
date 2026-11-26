@@ -1,0 +1,28 @@
+# DRA 队列配额（v1.15+）。capacity 插件把 DeviceClass 纳入 capability/deserved/
+# guarantee；需要 Kubernetes DRA 与可用的 DRA driver。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, reclaim"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: capacity
+        enableHierarchy: true
+        arguments:
+          capacity.DynamicResourceAllocationEnable: "true"
+          capacity.DRAConsumableCapacityEnable: "true"
+      - name: nodeorder

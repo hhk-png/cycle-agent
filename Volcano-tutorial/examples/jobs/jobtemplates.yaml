@@ -1,0 +1,50 @@
+# JobFlow 通过名字引用同 namespace 下的 JobTemplate；模板 spec 就是 Volcano JobSpec。
+apiVersion: flow.volcano.sh/v1alpha1
+kind: JobTemplate
+metadata:
+  name: prep
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 1
+  maxRetry: 2
+  tasks:
+    - name: prep
+      replicas: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: prep
+              image: busybox:1.36
+              command: ["sh", "-c", "echo prepare dataset; sleep 5"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+---
+apiVersion: flow.volcano.sh/v1alpha1
+kind: JobTemplate
+metadata:
+  name: train
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  minAvailable: 2
+  maxRetry: 3
+  tasks:
+    - name: train
+      replicas: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: train
+              image: busybox:1.36
+              command: ["sh", "-c", "echo train; sleep 30"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi

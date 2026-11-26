@@ -1,0 +1,7 @@
+# MiniMLflow runtime. The implementation intentionally avoids a web framework,
+# SQL ORM, HTTP client library, and numerical stack; PyYAML is used for the
+# MLmodel/MLproject/config files.
+PyYAML>=6.0
+
+# Verification tooling.
+pytest>=8.0

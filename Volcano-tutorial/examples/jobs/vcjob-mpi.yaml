@@ -1,0 +1,42 @@
+# MPI 作业：mpi 插件负责生成 hostfile 与 launcher 环境，ssh/svc 提供互通基础。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: mpi-job
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-a
+  minAvailable: 3
+  maxRetry: 2
+  plugins:
+    ssh: []
+    svc: []
+    mpi: []
+  tasks:
+    - name: mpimaster
+      replicas: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mpi
+              image: busybox:1.36
+              command: ["sh", "-c", "echo mpimaster; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi
+    - name: mpiworker
+      replicas: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mpi
+              image: busybox:1.36
+              command: ["sh", "-c", "echo mpiworker; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi

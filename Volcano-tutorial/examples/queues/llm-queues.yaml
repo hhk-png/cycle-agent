@@ -1,0 +1,54 @@
+# LLM 平台的四个扁平队列：预训练、微调、推理、Agent。
+# 口径：512 卡集群，Σ guarantee=384 ≤ 512×0.9，Σ capability=960 > 512（允许超卖）。
+# 如果使用层级 capacity，把这四个队列挂到同一个父队列下，不要再启用 proportion。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: llm-train
+spec:
+  weight: 4
+  priority: 10
+  reclaimable: true
+  guarantee:
+    nvidia.com/gpu: "256"
+  capability:
+    nvidia.com/gpu: "512"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: llm-finetune
+spec:
+  weight: 2
+  priority: 5
+  reclaimable: true
+  guarantee:
+    nvidia.com/gpu: "64"
+  capability:
+    nvidia.com/gpu: "256"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: llm-infer
+spec:
+  weight: 2
+  priority: 8
+  # 在线推理不允许被训练队列回收；guarantee 是它的底线。
+  reclaimable: false
+  guarantee:
+    nvidia.com/gpu: "64"
+  capability:
+    nvidia.com/gpu: "128"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: llm-agent
+spec:
+  weight: 1
+  priority: 3
+  reclaimable: true
+  # Agent 没有保底，完全借空闲；capability 防止突发吃光集群。
+  capability:
+    nvidia.com/gpu: "64"

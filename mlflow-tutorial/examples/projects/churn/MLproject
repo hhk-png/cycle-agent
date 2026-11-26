@@ -1,0 +1,12 @@
+name: churn-demo
+
+entry_points:
+  main:
+    parameters:
+      alpha:
+        type: float
+        default: 0.1
+      seed:
+        type: int
+        default: 42
+    command: "python train.py --alpha {alpha} --seed {seed}"

@@ -1,0 +1,39 @@
+# Scheduler config that adds shuffle + rescheduling + pdb on top of the
+# default fairness pipeline. rescheduling uses the upstream
+# lowNodeUtilization direction (evict from hot nodes, let nodeorder spread
+# onto cold nodes), so nodeorder is kept and binpack is deliberately omitted.
+# PDB is in the same tier as rescheduling so both can influence shuffle's
+# VictimTasks nomination. Argument names are version-sensitive; check the
+# release notes before applying.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, preempt, reclaim, shuffle"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: proportion
+        enablePreemptable: true
+      - name: nodeorder
+      - name: pdb
+      - name: rescheduling
+        arguments:
+          interval: "5m"
+          strategies:
+            - name: lowNodeUtilization
+              params:
+                thresholds: {cpu: 20, memory: 20, pods: 20}
+                targetThresholds: {cpu: 50, memory: 50, pods: 50}

@@ -1,0 +1,14 @@
+# 两阶段 DAG：prep 完成后才会创建 train。flows[].name 同时是 DAG 节点名和
+# 被引用的 JobTemplate 名；创建出的 Job 名为 <jobflow>-<flow>。
+apiVersion: flow.volcano.sh/v1alpha1
+kind: JobFlow
+metadata:
+  name: ml-pipeline
+  namespace: default
+spec:
+  jobRetainPolicy: retain
+  flows:
+    - name: prep
+    - name: train
+      dependsOn:
+        targets: ["prep"]

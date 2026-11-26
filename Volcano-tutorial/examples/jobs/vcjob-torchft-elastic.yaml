@@ -1,0 +1,65 @@
+# 弹性训练骨架：8 个副本，minAvailable=6。
+# 被驱逐的 Pod 不触发 RestartJob，而是保持 Pending 等待重新调度；
+# 只要仍有 6 个副本在跑，框架（TorchFT/PyTorch Elastic）就可以继续训练。
+# 真正的成员变更、重新分片和 checkpoint 兼容由框架负责，Volcano 只保证最小可用 gang。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: llm-torchft-elastic
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: llm-finetune
+  minAvailable: 6
+  maxRetry: 10
+  plugins:
+    svc: []
+  policies:
+    # PodFailed 仍然重建；PodEvicted 故意不配置 RestartJob，保留弹性语义。
+    - event: PodFailed
+      action: RestartTask
+  tasks:
+    - name: worker
+      replicas: 8
+      template:
+        metadata:
+          labels:
+            app: llm-torchft
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          containers:
+            - name: trainer
+              image: nvcr.io/nvidia/pytorch:24.10-py3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  # 占位：真实命令由 TorchFT/PyTorch Elastic 的 rendezvous 决定。
+                  python -m torchft.train \
+                    --min-replicas 6 \
+                    --checkpoint-dir /checkpoints/elastic \
+                    --save-steps 100
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: 64Gi
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: checkpoints
+                  mountPath: /checkpoints
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 8Gi
+            - name: checkpoints
+              persistentVolumeClaim:
+                claimName: llm-checkpoints

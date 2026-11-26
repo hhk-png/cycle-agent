@@ -1,0 +1,151 @@
+# 64 卡预训练示例：8 个 Pod × 8 GPU，minAvailable=8 表示 8 个 Pod 必须一起启动。
+# 每个 Pod 是一个 8 卡节点：TP=8 在节点内 NVLink，PP=2/DP=4 跨节点走 IB。
+# 需要：8 台 8 卡 H100 节点、nvidia.com/gpu device plugin、覆盖 rack/spine 的 HyperNode。
+# 镜像、节点标签、NCCL 网卡名、训练脚本都是占位，按集群替换。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: llm-pretrain-64
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: llm-train
+  priorityClassName: high-priority
+  minAvailable: 8
+  maxRetry: 3
+  ttlSecondsAfterFinished: 604800
+  plugins:
+    ssh: []
+    svc: []
+    pytorch: ["--master=master", "--worker=worker"]
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+    - event: PodFailed
+      action: RestartJob
+  networkTopology:
+    mode: hard
+    highestTierAllowed: 3
+  tasks:
+    - name: master
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: llm-pretrain
+            role: master
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: trainer
+              image: nvcr.io/nvidia/pytorch:24.10-py3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  echo "rank=${RANK} master=${MASTER_ADDR} world=${WORLD_SIZE}"
+                  torchrun \
+                    --nnodes=8 \
+                    --nproc_per_node=8 \
+                    --node_rank=${RANK} \
+                    --master_addr=${MASTER_ADDR} \
+                    --master_port=29500 \
+                    train_pretrain.py \
+                    --parallel tp=8 pp=2 dp=4 \
+                    --seq-len 8192 \
+                    --global-batch-size 512
+              env:
+                - name: NCCL_IB_HCA
+                  value: "mlx5"
+                - name: NCCL_SOCKET_IFNAME
+                  value: "eth0"
+                - name: NCCL_DEBUG
+                  value: "WARN"
+              resources:
+                requests:
+                  cpu: "64"
+                  memory: 512Gi
+                  nvidia.com/gpu: "8"
+                limits:
+                  nvidia.com/gpu: "8"
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: checkpoints
+                  mountPath: /checkpoints
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Gi
+            - name: checkpoints
+              persistentVolumeClaim:
+                claimName: llm-checkpoints
+    - name: worker
+      replicas: 7
+      template:
+        metadata:
+          labels:
+            app: llm-pretrain
+            role: worker
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-H100-SXM5-80GB
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+              effect: NoSchedule
+          containers:
+            - name: trainer
+              image: nvcr.io/nvidia/pytorch:24.10-py3
+              command:
+                - bash
+                - -lc
+                - |
+                  set -euo pipefail
+                  echo "rank=${RANK} master=${MASTER_ADDR} world=${WORLD_SIZE}"
+                  torchrun \
+                    --nnodes=8 \
+                    --nproc_per_node=8 \
+                    --node_rank=${RANK} \
+                    --master_addr=${MASTER_ADDR} \
+                    --master_port=29500 \
+                    train_pretrain.py \
+                    --parallel tp=8 pp=2 dp=4 \
+                    --seq-len 8192 \
+                    --global-batch-size 512
+              env:
+                - name: NCCL_IB_HCA
+                  value: "mlx5"
+                - name: NCCL_SOCKET_IFNAME
+                  value: "eth0"
+                - name: NCCL_DEBUG
+                  value: "WARN"
+              resources:
+                requests:
+                  cpu: "64"
+                  memory: 512Gi
+                  nvidia.com/gpu: "8"
+                limits:
+                  nvidia.com/gpu: "8"
+              volumeMounts:
+                - name: dshm
+                  mountPath: /dev/shm
+                - name: checkpoints
+                  mountPath: /checkpoints
+          volumes:
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Gi
+            - name: checkpoints
+              persistentVolumeClaim:
+                claimName: llm-checkpoints

@@ -1,0 +1,64 @@
+# PodGroup-level topology anti-affinity (v1.16 group-topology-affinity).
+# Pods join this PodGroup through:
+#   scheduling.k8s.io/group-name: inference-a
+#   spec.schedulerName: volcano
+# The required list has no weight; preferred terms set weight 1-100.
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: PodGroup
+metadata:
+  name: inference-a
+  namespace: default
+  labels:
+    app: inference
+    serving-group: online
+spec:
+  minMember: 2
+  queue: default
+  networkTopology:
+    mode: hard
+    highestTierName: supernode
+  topologyAffinity:
+    podGroupAntiAffinity:
+      required:
+        - podGroupSelector:
+            labelSelector:
+              matchLabels:
+                serving-group: online
+          topologyTierName: supernode
+      preferred:
+        - podGroupSelector:
+            labelSelector:
+              matchLabels:
+                app: inference
+          topologyTierName: rack
+          weight: 50
+---
+# Non-Volcano workload joining the PodGroup above. Both Pods carry the
+# group-name annotation; the scheduler treats them as one gang.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-a
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inference
+  template:
+    metadata:
+      labels:
+        app: inference
+        serving-group: online
+      annotations:
+        scheduling.k8s.io/group-name: inference-a
+    spec:
+      schedulerName: volcano
+      containers:
+        - name: server
+          image: busybox:1.36
+          command: ["sh", "-c", "sleep 3600"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi

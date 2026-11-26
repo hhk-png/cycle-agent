@@ -1,0 +1,30 @@
+# minAvailable 小于总副本数：先让 8 个 Pod 成组启动，剩余 8 个等资源空闲后再扩容。
+# 如果 minAvailable 等于 replicas，就是严格的 all-or-nothing。
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: elastic-gang
+  namespace: default
+spec:
+  schedulerName: volcano
+  queue: team-b
+  minAvailable: 8
+  maxRetry: 3
+  policies:
+    - event: PodEvicted
+      action: RestartJob
+  tasks:
+    - name: worker
+      replicas: 16
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo worker; sleep 3600"]
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                  nvidia.com/gpu: "1"

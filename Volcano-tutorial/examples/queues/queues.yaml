@@ -1,0 +1,33 @@
+# 两个租户队列。capability 是硬上限，guarantee 是其他队列不可占用的保底，
+# weight 只在 proportion 插件下决定 deserved 的分配比例。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: team-a
+spec:
+  weight: 3
+  reclaimable: true
+  capability:
+    cpu: "64"
+    memory: 256Gi
+    nvidia.com/gpu: "8"
+  guarantee:
+    cpu: "8"
+    memory: 32Gi
+    nvidia.com/gpu: "2"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: team-b
+spec:
+  weight: 1
+  reclaimable: true
+  capability:
+    cpu: "32"
+    memory: 128Gi
+    nvidia.com/gpu: "4"
+  guarantee:
+    cpu: "4"
+    memory: 16Gi
+    nvidia.com/gpu: "1"

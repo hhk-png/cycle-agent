@@ -1,0 +1,28 @@
+# TDM：把可撤销节点在固定时间窗内交给 preemptable 作业。时间使用本地时钟，
+# evict.period 控制窗口结束后的驱逐节奏。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill, preempt, reclaim"
+    tiers:
+    - name: tier-1
+      plugins:
+      - name: priority
+      - name: gang
+        enablePreemptable: true
+        enableJobStarving: true
+      - name: conformance
+    - name: tier-2
+      plugins:
+      - name: drf
+      - name: predicates
+      - name: proportion
+      - name: tdm
+        arguments:
+          tdm.revocable-zone.rz1: "1:00-4:00"
+          tdm.evict.period: "1m"
+      - name: nodeorder

@@ -1,0 +1,43 @@
+# 层级队列：org 是一个父队列，org-a/org-b 按 weight 分享 org 的 capability。
+# Volcano 会自动维护名为 root 的根队列；父队列本身不直接承载作业。
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: org
+spec:
+  weight: 1
+  reclaimable: true
+  capability:
+    cpu: "64"
+    memory: 256Gi
+    nvidia.com/gpu: "8"
+  guarantee:
+    cpu: "16"
+    memory: 64Gi
+    nvidia.com/gpu: "2"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: org-a
+spec:
+  parent: org
+  weight: 1
+  reclaimable: true
+  guarantee:
+    cpu: "4"
+    memory: 16Gi
+    nvidia.com/gpu: "1"
+---
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: org-b
+spec:
+  parent: org
+  weight: 1
+  reclaimable: true
+  guarantee:
+    cpu: "4"
+    memory: 16Gi
+    nvidia.com/gpu: "1"

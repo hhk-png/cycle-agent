@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 5s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: mini-lab
+
+scrape_configs:
+  - job_name: demo
+    static_configs:
+      - targets: ["127.0.0.1:9100"]
+        labels:
+          env: lab
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "go_.*"
+        action: drop
+
+  - job_name: mini-prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+        labels:
+          env: lab
+
+rule_files:
+  - "../rules/demo.yml"
+
+# Uncomment to forward every appended sample to another Mini/Prometheus.
+# remote_write:
+#   - url: http://127.0.0.1:9201/api/v1/write
+#     protocol: json

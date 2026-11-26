@@ -1,0 +1,33 @@
+groups:
+  - name: demo
+    interval: 15s
+    limit: 10000
+    rules:
+      - record: job:demo_requests:rate5m
+        expr: sum by (job) (rate(demo_http_requests_total[5m]))
+
+      - record: job:demo_errors:ratio5m
+        expr: |
+          sum by (job) (rate(demo_http_requests_total{code="500"}[5m]))
+          /
+          sum by (job) (rate(demo_http_requests_total[5m]))
+
+      - alert: DemoHighErrorRatio
+        expr: |
+          sum by (job) (rate(demo_http_requests_total{code="500"}[5m]))
+          /
+          sum by (job) (rate(demo_http_requests_total[5m])) > 0.2
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} 5xx ratio is {{ $value }}"
+          runbook_url: "https://example.invalid/runbooks/demo-errors"
+
+      - alert: DemoTargetDown
+        expr: up{job="demo"} == 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.instance }} is down"
